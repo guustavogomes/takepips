@@ -1,4 +1,4 @@
-import { Signal, CreateSignalData } from '../entities/Signal';
+import { Signal, CreateSignalData, SignalStatus } from '../entities/Signal';
 
 /**
  * Interface do repositório de sinais
@@ -35,5 +35,14 @@ export interface ISignalRepository {
    * @returns Promise com array de sinais
    */
   findBySymbol(symbol: string, limit?: number): Promise<Signal[]>;
+
+  /**
+   * Atualiza o status de um sinal (quando atinge stop loss ou take)
+   * @param id ID do sinal
+   * @param status Novo status (STOP_LOSS, TAKE1, TAKE2, TAKE3)
+   * @param hitPrice Preço exato quando o nível foi atingido
+   * @returns Promise com o sinal atualizado
+   */
+  updateStatus(id: string, status: SignalStatus, hitPrice: number): Promise<Signal>;
 }
 

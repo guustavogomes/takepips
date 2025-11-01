@@ -31,6 +31,7 @@ string SellTake1Line = LinePrefix + "SellTake1";
 string SellTake2Line = LinePrefix + "SellTake2";
 string SellTake3Line = LinePrefix + "SellTake3";
 string ButtonName = LinePrefix + "SendButton";
+string TestButtonName = LinePrefix + "TestButton";
 
 //--- Variáveis de controle
 bool LinesInitialized = false;
@@ -48,8 +49,9 @@ int OnInit()
    // Criar linhas iniciais se não existirem
    CreateLinesIfNeeded();
    
-   // Criar botão de envio
+   // Criar botões
    CreateSendButton();
+   CreateTestButton();
    
    // Criar labels imediatamente após criar as linhas
    UpdateAllLabels();
@@ -246,6 +248,10 @@ void OnChartEvent(const int id,
       if(sparam == ButtonName)
       {
          OnSendButtonClick();
+      }
+      else if(sparam == TestButtonName)
+      {
+         OnTestButtonClick();
       }
    }
    
@@ -452,6 +458,34 @@ void CreateSendButton()
 }
 
 //+------------------------------------------------------------------+
+//| Criar botão de teste de conexão                                 |
+//+------------------------------------------------------------------+
+void CreateTestButton()
+{
+   int x = 170; // Ao lado do botão de envio
+   int y = 30;
+   int width = 150;
+   int height = 30;
+   
+   if(ObjectFind(0, TestButtonName) < 0)
+   {
+      ObjectCreate(0, TestButtonName, OBJ_BUTTON, 0, 0, 0);
+      ObjectSetInteger(0, TestButtonName, OBJPROP_XDISTANCE, x);
+      ObjectSetInteger(0, TestButtonName, OBJPROP_YDISTANCE, y);
+      ObjectSetInteger(0, TestButtonName, OBJPROP_XSIZE, width);
+      ObjectSetInteger(0, TestButtonName, OBJPROP_YSIZE, height);
+      ObjectSetInteger(0, TestButtonName, OBJPROP_BGCOLOR, clrDarkGreen);
+      ObjectSetInteger(0, TestButtonName, OBJPROP_COLOR, clrWhite);
+      ObjectSetInteger(0, TestButtonName, OBJPROP_BORDER_COLOR, clrWhite);
+      ObjectSetInteger(0, TestButtonName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
+      ObjectSetString(0, TestButtonName, OBJPROP_TEXT, "Testar Conexão");
+      ObjectSetInteger(0, TestButtonName, OBJPROP_FONTSIZE, FontSize);
+      ObjectSetInteger(0, TestButtonName, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, TestButtonName, OBJPROP_SELECTED, false);
+   }
+}
+
+//+------------------------------------------------------------------+
 //| Manipulador de clique no botão de envio                         |
 //+------------------------------------------------------------------+
 void OnSendButtonClick()
@@ -571,24 +605,200 @@ void OnSendButtonClick()
 }
 
 //+------------------------------------------------------------------+
+//| Manipulador de clique no botão de teste                         |
+//+------------------------------------------------------------------+
+void OnTestButtonClick()
+{
+   Print("=== TESTE DE CONEXÃO ===");
+   Print("URL: ", EndpointURL);
+   
+   // Preparar dados de teste
+   datetime currentTime = TimeCurrent();
+   MqlDateTime dt;
+   TimeToStruct(currentTime, dt);
+   string timeStr = StringFormat("%04d.%02d.%02d %02d:%02d:%02d", 
+                                 dt.year, dt.mon, dt.day, 
+                                 dt.hour, dt.min, dt.sec);
+   
+   double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+   
+   // Criar JSON de teste com valores de exemplo
+   string testJson = "{"
+                    + "\"name\":\"TakePips\","
+                    + "\"type\":\"BUY\","
+                    + "\"symbol\":\"" + _Symbol + "\","
+                    + "\"entry\":" + DoubleToString(currentPrice, digits) + ","
+                    + "\"stopLoss\":" + DoubleToString(currentPrice * 0.999, digits) + ","
+                    + "\"take1\":" + DoubleToString(currentPrice * 1.001, digits) + ","
+                    + "\"take2\":" + DoubleToString(currentPrice * 1.002, digits) + ","
+                    + "\"take3\":" + DoubleToString(currentPrice * 1.003, digits) + ","
+                    + "\"stopTicks\":100,"
+                    + "\"time\":\"" + timeStr + "\""
+                    + "}";
+   
+   Print("Enviando requisição de teste...");
+   
+   // Preparar cabeçalhos HTTP - formato correto para MT5
+   string headers = "";
+   headers = headers + "Content-Type: application/json\r\n";
+   headers = headers + "User-Agent: MetaTrader5\r\n";
+   
+   // Preparar dados - garantir que o array tenha tamanho suficiente
+   char post[];
+   char result[];
+   string result_headers;
+   
+   // Converter JSON para array de bytes - método correto para MT5
+   int jsonLen = StringLen(testJson);
+   // MT5 requer espaço extra no array para o terminador null
+   ArrayResize(post, jsonLen + 1);
+   StringToCharArray(testJson, post, 0, WHOLE_ARRAY, CP_UTF8);
+   
+   // Preparar array de resultado
+   ArrayResize(result, 0);
+   result_headers = ""; // result_headers é uma string, não um array
+   
+   // Realizar requisição HTTP POST
+   int timeout = 10000; // 10 segundos para teste
+   ResetLastError(); // Limpar erros anteriores
+   int res = WebRequest("POST", EndpointURL, headers, timeout, post, result, result_headers);
+   
+   // Analisar resultado
+   string resultStr = CharArrayToString(result);
+   string resultHeadersStr = result_headers;
+   
+   if(res == -1)
+   {
+      int error = GetLastError();
+      Print("❌ ERRO WebRequest: ", error);
+      Print("URL tentada: ", EndpointURL);
+      
+      string errorMsg = "❌ FALHA NA CONEXÃO\n\n";
+      errorMsg += "URL: " + EndpointURL + "\n";
+      errorMsg += "Erro: " + IntegerToString(error) + "\n\n";
+      
+      if(error == 4060)
+      {
+         errorMsg += "⚠️ Erro 4060: URL não permitida.\n\n";
+         errorMsg += "Adicione esta URL nas configurações:\n";
+         errorMsg += "Tools -> Options -> Expert Advisors\n";
+         errorMsg += "Marque: 'Allow WebRequest for listed URL'\n";
+         errorMsg += "Adicione: " + EndpointURL;
+         Alert(errorMsg);
+      }
+      else if(error == 4006)
+      {
+         errorMsg += "⚠️ Erro 4006: Problema com SSL/TLS (HTTPS).\n\n";
+         errorMsg += "Este erro geralmente ocorre com URLs HTTPS.\n\n";
+         errorMsg += "Soluções possíveis:\n";
+         errorMsg += "1. Verifique se o MT5 está atualizado\n";
+         errorMsg += "2. Adicione a URL nas URLs permitidas:\n";
+         errorMsg += "   Tools -> Options -> Expert Advisors\n";
+         errorMsg += "   Marque: 'Allow WebRequest for listed URL'\n";
+         errorMsg += "   Adicione: " + EndpointURL + "\n";
+         errorMsg += "3. Reinicie o MT5 COMPLETAMENTE\n";
+         errorMsg += "4. Tente usar domínio completo na URL permitida:\n";
+         errorMsg += "   https://takepips.vercel.app/*\n";
+         errorMsg += "   https://*.vercel.app/*\n\n";
+         errorMsg += "Se ainda não funcionar, pode ser limitação do MT5 com certificados SSL.";
+         Alert(errorMsg);
+      }
+      else if(error == 4014)
+      {
+         errorMsg += "⚠️ Erro 4014: Falha na conexão HTTP.\n\n";
+         errorMsg += "Verifique:\n";
+         errorMsg += "1. URL está correta?\n";
+         errorMsg += "2. Servidor está online?\n";
+         errorMsg += "3. Firewall não está bloqueando?\n";
+         errorMsg += "4. URL foi adicionada nas URLs permitidas?\n";
+         errorMsg += "5. MT5 foi reiniciado após adicionar URL?";
+         Alert(errorMsg);
+      }
+      else
+      {
+         errorMsg += "Código de erro: " + IntegerToString(error) + "\n\n";
+         errorMsg += "Verifique a documentação do MT5 para este código de erro.";
+         Alert(errorMsg);
+      }
+   }
+   else if(res >= 200 && res < 300)
+   {
+      string successMsg = "✅ CONEXÃO OK!\n\n";
+      successMsg += "URL: " + EndpointURL + "\n";
+      successMsg += "Status: " + IntegerToString(res) + " (Sucesso)\n\n";
+      successMsg += "Resposta do servidor:\n";
+      
+      // Limitar tamanho da resposta para o Alert
+      if(StringLen(resultStr) > 200)
+      {
+         successMsg += StringSubstr(resultStr, 0, 200) + "...";
+      }
+      else
+      {
+         successMsg += resultStr;
+      }
+      
+      Print("✅ SUCESSO! Status: ", res);
+      Print("Resposta: ", resultStr);
+      Print("Headers: ", resultHeadersStr);
+      
+      Alert(successMsg);
+   }
+   else
+   {
+      string errorMsg = "⚠️ RESPOSTA INESPERADA\n\n";
+      errorMsg += "URL: " + EndpointURL + "\n";
+      errorMsg += "Status HTTP: " + IntegerToString(res) + "\n\n";
+      
+      if(StringLen(resultStr) > 200)
+      {
+         errorMsg += "Resposta: " + StringSubstr(resultStr, 0, 200) + "...";
+      }
+      else
+      {
+         errorMsg += "Resposta: " + resultStr;
+      }
+      
+      Print("⚠️ Status inesperado: ", res);
+      Print("Resposta: ", resultStr);
+      
+      Alert(errorMsg);
+   }
+   
+   Print("=== FIM DO TESTE ===");
+}
+
+//+------------------------------------------------------------------+
 //| Enviar sinal para o endpoint                                    |
 //+------------------------------------------------------------------+
 bool SendSignalToEndpoint(string jsonData)
 {
    string url = EndpointURL;
    
-   // Preparar cabeçalhos HTTP
-   string headers = "Content-Type: application/json\r\n";
+   // Preparar cabeçalhos HTTP - formato correto para MT5
+   string headers = "";
+   headers = headers + "Content-Type: application/json\r\n";
+   headers = headers + "User-Agent: MetaTrader5\r\n";
    
-   // Preparar dados
+   // Preparar dados - garantir que o array tenha tamanho suficiente
    char post[];
    char result[];
    string result_headers;
    
+   // Converter JSON para array de bytes - método correto para MT5
+   int jsonLen = StringLen(jsonData);
+   // MT5 requer espaço extra no array para o terminador null
+   ArrayResize(post, jsonLen + 1);
    StringToCharArray(jsonData, post, 0, WHOLE_ARRAY, CP_UTF8);
+   
+   // Preparar array de resultado
+   ArrayResize(result, 0);
+   result_headers = ""; // result_headers é uma string, não um array
    
    // Realizar requisição HTTP POST
    int timeout = 5000; // 5 segundos
+   ResetLastError(); // Limpar erros anteriores
    int res = WebRequest("POST", url, headers, timeout, post, result, result_headers);
    
    if(res == -1)
@@ -600,6 +810,17 @@ bool SendSignalToEndpoint(string jsonData)
       if(error == 4060)
       {
          Alert("Erro 4060: URL não permitida.\n\nAdicione '" + url + "' nas URLs permitidas:\nTools -> Options -> Expert Advisors -> Allow WebRequest for listed URL");
+      }
+      else if(error == 4006)
+      {
+         string errorMsg = "Erro 4006: Problema com SSL/TLS (HTTPS).\n\n";
+         errorMsg += "Este erro ocorre com URLs HTTPS.\n\n";
+         errorMsg += "Soluções:\n";
+         errorMsg += "1. Adicione a URL nas URLs permitidas\n";
+         errorMsg += "2. Reinicie o MT5 COMPLETAMENTE\n";
+         errorMsg += "3. Verifique se o MT5 está atualizado\n";
+         errorMsg += "4. URL permitida: " + url;
+         Alert(errorMsg);
       }
       else if(error == 4014)
       {

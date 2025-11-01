@@ -4,6 +4,7 @@ import { validateSignalData } from '../../shared/validators/signalValidator';
 import { handleError } from '../../shared/utils/errorHandler';
 import { ApiResponse } from '../../shared/types/ApiResponse';
 import { CreateSignalData } from '../../domain/entities/Signal';
+import { notifyNewSignal } from '../../shared/utils/pushNotifications';
 
 /**
  * Controller para gerenciar requisições relacionadas a sinais
@@ -28,6 +29,22 @@ export class SignalController {
       // Executar use case
       const signal = await this.createSignalUseCase.execute(validatedData as CreateSignalData);
 
+      // Enviar notificação push para novo sinal (não bloqueia a resposta)
+      console.log('[SIGNAL] Novo sinal criado, enviando notificação push...', {
+        id: signal.id,
+        type: signal.type,
+        symbol: signal.symbol
+      });
+      
+      notifyNewSignal(signal.type, signal.symbol, signal.entry, signal.stopLoss, signal.take1)
+        .then(() => {
+          console.log('[PUSH] ✅ Notificação de novo sinal enviada com sucesso');
+        })
+        .catch(error => {
+          console.error('[PUSH] ❌ Erro ao enviar notificação de novo sinal:', error);
+          console.error('[PUSH] Stack:', error instanceof Error ? error.stack : 'N/A');
+        });
+
       // Retornar resposta de sucesso
       const response: ApiResponse = {
         success: true,
@@ -42,6 +59,7 @@ export class SignalController {
           take2: signal.take2,
           take3: signal.take3,
           stopTicks: signal.stopTicks,
+          status: signal.status,
           time: signal.time.toISOString(),
           createdAt: signal.createdAt.toISOString(),
         },

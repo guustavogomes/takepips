@@ -13,33 +13,46 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<void> {
-  // Log da requisição
-  console.log(`[API] ${req.method} ${req.url} - ${new Date().toISOString()}`);
-  
-  // Configurar CORS para permitir requisições do MT5
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  // Tratar requisição OPTIONS (preflight)
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-
-  // Apenas aceitar POST
-  if (req.method !== 'POST') {
-    res.status(405).json({
-      success: false,
-      error: {
-        message: 'Método não permitido. Use POST.',
-        code: 'METHOD_NOT_ALLOWED',
-      },
-    });
-    return;
-  }
-
   try {
+    // Log da requisição
+    console.log(`[API] ${req.method} ${req.url} - ${new Date().toISOString()}`);
+    
+    // Configurar CORS para permitir requisições do MT5
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    // Tratar requisição OPTIONS (preflight)
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+
+    // Apenas aceitar POST
+    if (req.method !== 'POST') {
+      res.status(405).json({
+        success: false,
+        error: {
+          message: 'Método não permitido. Use POST.',
+          code: 'METHOD_NOT_ALLOWED',
+        },
+      });
+      return;
+    }
+
+    // Verificar variáveis de ambiente antes de inicializar dependências
+    if (!process.env.DATABASE_URL) {
+      console.error('[ERROR] DATABASE_URL não está configurada');
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Configuração do servidor incompleta. Contate o administrador.',
+          code: 'CONFIGURATION_ERROR',
+        },
+      });
+      return;
+    }
+
     // Dependency Injection - criar instâncias seguindo SOLID
     const signalRepository = new SignalRepository();
     const createSignalUseCase = new CreateSignalUseCase(signalRepository);
@@ -48,7 +61,16 @@ export default async function handler(
     // Delegar para o controller
     await signalController.create(req, res);
   } catch (error) {
-    console.error('Erro não tratado:', error);
+    // Log detalhado do erro
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    console.error('[ERROR] Erro não tratado:', {
+      message: errorMessage,
+      stack: errorStack,
+      error: error,
+    });
+
     res.status(500).json({
       success: false,
       error: {

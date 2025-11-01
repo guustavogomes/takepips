@@ -1,5 +1,5 @@
 import { ISignalRepository } from '../../domain/repositories/ISignalRepository';
-import { Signal, CreateSignalData } from '../../domain/entities/Signal';
+import { Signal, CreateSignalData, SignalStatus } from '../../domain/entities/Signal';
 import { dbConnection } from '../database/connection';
 import { parseMT5DateTime } from '../../shared/utils/dateUtils';
 import { generateUUID } from '../../shared/utils/uuid';
@@ -23,9 +23,9 @@ export class SignalRepository implements ISignalRepository {
       INSERT INTO signals (
         id, name, type, symbol, entry, stop_loss, 
         take1, take2, take3, stop_ticks, time, 
-        created_at, updated_at
+        status, created_at, updated_at
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
       )
       RETURNING *
     `;
@@ -42,9 +42,10 @@ export class SignalRepository implements ISignalRepository {
       data.take3.toString(),
       data.stopTicks,
       signalTime.toISOString(),
+      'PENDING', // Status inicial
       now.toISOString(),
       now.toISOString(),
-    ]);
+    ]) as Record<string, any>[];
 
     if (!result || result.length === 0) {
       throw new Error('Falha ao criar sinal no banco de dados');
@@ -55,7 +56,7 @@ export class SignalRepository implements ISignalRepository {
 
   async findById(id: string): Promise<Signal | null> {
     const query = 'SELECT * FROM signals WHERE id = $1';
-    const result = await this.sql(query, [id]);
+    const result = await this.sql(query, [id]) as Record<string, any>[];
 
     if (!result || result.length === 0) {
       return null;
@@ -66,24 +67,87 @@ export class SignalRepository implements ISignalRepository {
 
   async findAll(limit = 100, offset = 0): Promise<Signal[]> {
     const query = 'SELECT * FROM signals ORDER BY created_at DESC LIMIT $1 OFFSET $2';
-    const result = await this.sql(query, [limit, offset]);
+    const result = await this.sql(query, [limit, offset]) as Record<string, any>[];
 
     if (!result) {
       return [];
     }
 
-    return result.map((row: unknown) => this.mapRowToSignal(row));
+    return result.map((row) => this.mapRowToSignal(row));
   }
 
   async findBySymbol(symbol: string, limit = 100): Promise<Signal[]> {
     const query = 'SELECT * FROM signals WHERE symbol = $1 ORDER BY created_at DESC LIMIT $2';
-    const result = await this.sql(query, [symbol, limit]);
+    const result = await this.sql(query, [symbol, limit]) as Record<string, any>[];
 
     if (!result) {
       return [];
     }
 
-    return result.map((row: unknown) => this.mapRowToSignal(row));
+    return result.map((row) => this.mapRowToSignal(row));
+  }
+
+  async updateStatus(id: string, status: SignalStatus, hitPrice: number): Promise<Signal> {
+    const now = new Date();
+    let query = '';
+    let params: any[] = [];
+    
+    // Determinar qual campo atualizar baseado no status
+    if (status === 'STOP_LOSS') {
+      query = `
+        UPDATE signals 
+        SET status = $1, 
+            stop_hit_at = $2, 
+            stop_hit_price = $3, 
+            updated_at = $4
+        WHERE id = $5
+        RETURNING *
+      `;
+      params = [status, now.toISOString(), hitPrice.toString(), now.toISOString(), id];
+    } else if (status === 'TAKE1') {
+      query = `
+        UPDATE signals 
+        SET status = $1, 
+            take1_hit_at = $2, 
+            take1_hit_price = $3, 
+            updated_at = $4
+        WHERE id = $5
+        RETURNING *
+      `;
+      params = [status, now.toISOString(), hitPrice.toString(), now.toISOString(), id];
+    } else if (status === 'TAKE2') {
+      query = `
+        UPDATE signals 
+        SET status = $1, 
+            take2_hit_at = $2, 
+            take2_hit_price = $3, 
+            updated_at = $4
+        WHERE id = $5
+        RETURNING *
+      `;
+      params = [status, now.toISOString(), hitPrice.toString(), now.toISOString(), id];
+    } else if (status === 'TAKE3') {
+      query = `
+        UPDATE signals 
+        SET status = $1, 
+            take3_hit_at = $2, 
+            take3_hit_price = $3, 
+            updated_at = $4
+        WHERE id = $5
+        RETURNING *
+      `;
+      params = [status, now.toISOString(), hitPrice.toString(), now.toISOString(), id];
+    } else {
+      throw new Error(`Status inválido para atualização: ${status}`);
+    }
+
+    const result = await this.sql(query, params) as Record<string, any>[];
+
+    if (!result || result.length === 0) {
+      throw new Error('Sinal não encontrado ou falha ao atualizar status');
+    }
+
+    return this.mapRowToSignal(result[0]);
   }
 
   /**
@@ -104,6 +168,15 @@ export class SignalRepository implements ISignalRepository {
       take3: parseFloat(row.take3),
       stopTicks: parseInt(row.stop_ticks, 10),
       time: new Date(row.time),
+      status: (row.status || 'PENDING') as SignalStatus,
+      stopHitAt: row.stop_hit_at ? new Date(row.stop_hit_at) : undefined,
+      take1HitAt: row.take1_hit_at ? new Date(row.take1_hit_at) : undefined,
+      take2HitAt: row.take2_hit_at ? new Date(row.take2_hit_at) : undefined,
+      take3HitAt: row.take3_hit_at ? new Date(row.take3_hit_at) : undefined,
+      stopHitPrice: row.stop_hit_price ? parseFloat(row.stop_hit_price) : undefined,
+      take1HitPrice: row.take1_hit_price ? parseFloat(row.take1_hit_price) : undefined,
+      take2HitPrice: row.take2_hit_price ? parseFloat(row.take2_hit_price) : undefined,
+      take3HitPrice: row.take3_hit_price ? parseFloat(row.take3_hit_price) : undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
     };

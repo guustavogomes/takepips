@@ -1,4 +1,5 @@
 export type SignalType = 'BUY' | 'SELL';
+export type SignalStatus = 'PENDING' | 'STOP_LOSS' | 'TAKE1' | 'TAKE2' | 'TAKE3';
 
 export interface Signal {
   id: string;
@@ -12,6 +13,15 @@ export interface Signal {
   take3: number;
   stopTicks: number;
   time: Date;
+  status: SignalStatus;
+  stopHitAt?: Date;
+  take1HitAt?: Date;
+  take2HitAt?: Date;
+  take3HitAt?: Date;
+  stopHitPrice?: number;
+  take1HitPrice?: number;
+  take2HitPrice?: number;
+  take3HitPrice?: number;
   createdAt: Date;
   updatedAt: Date;
 }
