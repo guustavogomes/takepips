@@ -628,6 +628,57 @@
             opacity: 0.5;
         }
 
+        /* Estilos para abas */
+        .tabs-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 24px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0;
+        }
+
+        .tab-button {
+            background: transparent;
+            border: none;
+            padding: 12px 24px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+            bottom: -2px;
+        }
+
+        .tab-button:hover {
+            color: var(--text-primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .tab-button.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+            background: rgba(99, 102, 241, 0.15);
+        }
+
+        .tab-button span {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .tabs-container {
+                gap: 5px;
+            }
+            
+            .tab-button {
+                padding: 10px 16px;
+                font-size: 0.85rem;
+            }
+        }
+
         @keyframes pulse {
             0%, 100% {
                 opacity: 1;
@@ -713,6 +764,16 @@
 
         <div id="errorContainer"></div>
 
+        <!-- Abas para filtrar sinais -->
+        <div class="tabs-container">
+            <button class="tab-button active" onclick="switchTab('active')" id="tabActive">
+                <span>🔄 Em Andamento</span>
+            </button>
+            <button class="tab-button" onclick="switchTab('closed')" id="tabClosed">
+                <span>✅ Encerrados</span>
+            </button>
+        </div>
+
         <div id="signalsContainer" class="signals-grid">
             <div class="loading">Carregando sinais...</div>
         </div>
@@ -722,6 +783,8 @@
         const API_URL = window.location.origin + '/api/signals/list';
         let autoRefreshInterval = null;
         let isAutoRefreshOn = false;
+        let currentTab = 'active'; // 'active' ou 'closed'
+        let allSignals = []; // Armazenar todos os sinais carregados
 
         async function loadSignals() {
             const container = document.getElementById('signalsContainer');
@@ -752,25 +815,9 @@
                     throw new Error(data.error?.message || 'Erro ao carregar sinais');
                 }
 
-                const signals = data.data || [];
-                updateStats(signals);
-                
-                if (signals.length === 0) {
-                    if (!isAutoRefreshing) {
-                        container.innerHTML = `
-                            <div class="empty-state">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                <h3>Nenhum sinal encontrado</h3>
-                                <p>Os sinais aparecerão aqui quando forem enviados pelo EA.</p>
-                            </div>
-                        `;
-                    }
-                } else {
-                    // Sempre atualizar, mesmo durante auto-refresh
-                    container.innerHTML = signals.map(signal => createSignalCard(signal)).join('');
-                }
+                allSignals = data.data || []; // Armazenar todos os sinais
+                updateStats(allSignals); // Atualizar estatísticas com todos os sinais
+                displaySignals(); // Exibir sinais filtrados pela aba ativa
             } catch (error) {
                 if (!isAutoRefreshing) {
                     errorContainer.innerHTML = `
@@ -787,6 +834,62 @@
                     refreshBtn.disabled = false;
                 }
             }
+        }
+
+        // Exibir sinais filtrados pela aba ativa
+        function displaySignals() {
+            const container = document.getElementById('signalsContainer');
+            const isAutoRefreshing = isAutoRefreshOn;
+            
+            // Filtrar sinais baseado na aba ativa
+            let filteredSignals = [];
+            
+            if (currentTab === 'active') {
+                // Sinais em andamento: todos exceto ENCERRADO
+                filteredSignals = allSignals.filter(signal => {
+                    const status = (signal.status || 'PENDING').toUpperCase();
+                    return status !== 'ENCERRADO';
+                });
+            } else {
+                // Sinais encerrados
+                filteredSignals = allSignals.filter(signal => {
+                    const status = (signal.status || 'PENDING').toUpperCase();
+                    return status === 'ENCERRADO';
+                });
+            }
+
+            if (filteredSignals.length === 0) {
+                if (!isAutoRefreshing || container.innerHTML.includes('loading')) {
+                    const emptyMessage = currentTab === 'active' 
+                        ? 'Nenhum sinal em andamento. Os sinais aparecerão aqui quando forem enviados pelo EA.'
+                        : 'Nenhum sinal encerrado ainda.';
+                    
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <h3>Nenhum sinal encontrado</h3>
+                            <p>${emptyMessage}</p>
+                        </div>
+                    `;
+                }
+            } else {
+                // Sempre atualizar, mesmo durante auto-refresh
+                container.innerHTML = filteredSignals.map(signal => createSignalCard(signal)).join('');
+            }
+        }
+
+        // Alternar entre abas
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Atualizar estado visual das abas
+            document.getElementById('tabActive').classList.toggle('active', tab === 'active');
+            document.getElementById('tabClosed').classList.toggle('active', tab === 'closed');
+            
+            // Exibir sinais filtrados
+            displaySignals();
         }
 
         function createSignalCard(signal) {
