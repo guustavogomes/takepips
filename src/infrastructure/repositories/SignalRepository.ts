@@ -127,16 +127,17 @@ export class SignalRepository implements ISignalRepository {
       `;
       params = [status, now.toISOString(), hitPrice.toString(), now.toISOString(), id];
     } else if (status === 'TAKE3') {
+      // Quando Take 3 é atingido, marcar automaticamente como ENCERRADO
       query = `
         UPDATE signals 
-        SET status = $1, 
-            take3_hit_at = $2, 
-            take3_hit_price = $3, 
-            updated_at = $4
-        WHERE id = $5
+        SET status = 'ENCERRADO',
+            take3_hit_at = $1, 
+            take3_hit_price = $2, 
+            updated_at = $3
+        WHERE id = $4
         RETURNING *
       `;
-      params = [status, now.toISOString(), hitPrice.toString(), now.toISOString(), id];
+      params = [now.toISOString(), hitPrice.toString(), now.toISOString(), id];
     } else if (status === 'ENCERRADO') {
       // Para status ENCERRADO, apenas atualiza o status (não precisa de hitPrice)
       query = `

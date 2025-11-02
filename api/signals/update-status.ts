@@ -108,17 +108,23 @@ export default async function handler(
     const updatedSignal = await signalRepository.updateStatus(id, status, hitPrice);
 
     // Enviar notificação push (não bloqueia a resposta)
+    // Se for TAKE3, o status no banco será ENCERRADO, mas a notificação ainda mostra TAKE3
     notifySignalUpdate(updatedSignal.type, updatedSignal.symbol, status, hitPrice)
       .catch(error => {
         console.error('[PUSH] Erro ao enviar notificação (não crítico):', error);
       });
+
+    // Log quando Take 3 encerra automaticamente
+    if (status === 'TAKE3') {
+      console.log(`[SIGNAL] Take 3 atingido - Sinal ${id} automaticamente encerrado`);
+    }
 
     // Retornar resposta de sucesso
     res.status(200).json({
       success: true,
       data: {
         id: updatedSignal.id,
-        status: updatedSignal.status,
+        status: updatedSignal.status, // Será 'ENCERRADO' se status original foi 'TAKE3'
         stopHitAt: updatedSignal.stopHitAt?.toISOString(),
         take1HitAt: updatedSignal.take1HitAt?.toISOString(),
         take2HitAt: updatedSignal.take2HitAt?.toISOString(),
