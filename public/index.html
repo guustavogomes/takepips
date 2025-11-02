@@ -1044,23 +1044,21 @@
             if (isAutoRefreshOn) {
                 clearInterval(autoRefreshInterval);
                 isAutoRefreshOn = false;
-                btn.textContent = '⏱️ Auto-refresh: OFF';
+                btn.innerHTML = '<span>⏱️ Auto-refresh: OFF</span>';
             } else {
-                autoRefreshInterval = setInterval(loadSignals, 3000); // Atualiza a cada 3 segundos (mais rápido)
+                // Intervalo otimizado: 15 segundos (reduz carga no servidor)
+                const refreshInterval = 15000;
+                autoRefreshInterval = setInterval(loadSignals, refreshInterval);
                 isAutoRefreshOn = true;
-                btn.textContent = '⏱️ Auto-refresh: ON (3s)';
+                btn.innerHTML = `<span>⏱️ Auto-refresh: ON (${refreshInterval / 1000}s)</span>`;
             }
         }
 
         // Carregar sinais ao iniciar
         loadSignals();
         
-        // Iniciar auto-refresh automaticamente após 2 segundos
-        setTimeout(() => {
-            if (!isAutoRefreshOn) {
-                autoRefresh();
-            }
-        }, 2000);
+        // Não iniciar auto-refresh automaticamente - deixar usuário escolher
+        // Isso reduz a carga no servidor e economiza recursos
         
         // Atualizar botão de notificações após carregar
         setTimeout(() => {
