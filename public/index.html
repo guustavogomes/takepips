@@ -694,7 +694,7 @@
                 <div class="stat-value" id="stopLossSignals" style="color: var(--danger-color);">0</div>
             </div>
             <div class="stat-card" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.1) 100%); border-color: rgba(99, 102, 241, 0.5);">
-                <div class="stat-label">Pontos Alcançados</div>
+                <div class="stat-label">Pontos Alcançados (30 dias)</div>
                 <div class="stat-value" id="totalPoints" style="color: var(--primary-color); font-size: 1.8rem;">0</div>
             </div>
         </div>
@@ -928,11 +928,31 @@
                 return status === 'STOP_LOSS' || status === 'STOPLOSS';
             }).length;
 
+            // Filtrar sinais dos últimos 30 dias para cálculo de pontos
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            
+            const signalsLast30Days = signals.filter(signal => {
+                const signalDate = new Date(signal.createdAt || signal.time);
+                return signalDate >= thirtyDaysAgo;
+            });
+
             // Calcular takes atingidos e pontos baseados na diferença de preço
+            // Usar TODOS os sinais para contar takes (estatística geral)
             let totalTakesHit = 0;
+            
+            // Usar apenas sinais dos últimos 30 dias para calcular pontos
             let totalPoints = 0;
 
+            // Contar takes de todos os sinais
             signals.forEach(signal => {
+                if (signal.take1HitPrice) totalTakesHit++;
+                if (signal.take2HitPrice) totalTakesHit++;
+                if (signal.take3HitPrice) totalTakesHit++;
+            });
+
+            // Calcular pontos apenas dos últimos 30 dias
+            signalsLast30Days.forEach(signal => {
                 // Trabalhar com a precisão original do banco (3 casas decimais)
                 // Normalizar para 3 casas decimais antes de calcular para evitar erros de ponto flutuante
                 const entry = parseFloat(parseFloat(signal.entry || 0).toFixed(3));
@@ -940,7 +960,6 @@
                 
                 // Calcular pontos do Take 1 (se atingido)
                 if (signal.take1HitPrice) {
-                    totalTakesHit++;
                     const take1Price = parseFloat(parseFloat(signal.take1HitPrice).toFixed(3));
                     let priceDiff = 0;
                     if (type === 'BUY') {
@@ -957,7 +976,6 @@
                 
                 // Calcular pontos do Take 2 (se atingido)
                 if (signal.take2HitPrice) {
-                    totalTakesHit++;
                     const take2Price = parseFloat(parseFloat(signal.take2HitPrice).toFixed(3));
                     let priceDiff = 0;
                     if (type === 'BUY') {
@@ -972,7 +990,6 @@
                 
                 // Calcular pontos do Take 3 (se atingido)
                 if (signal.take3HitPrice) {
-                    totalTakesHit++;
                     const take3Price = parseFloat(parseFloat(signal.take3HitPrice).toFixed(3));
                     let priceDiff = 0;
                     if (type === 'BUY') {
