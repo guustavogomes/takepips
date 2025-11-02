@@ -845,16 +845,16 @@
             let filteredSignals = [];
             
             if (currentTab === 'active') {
-                // Sinais em andamento: todos exceto ENCERRADO
+                // Sinais em andamento: todos exceto ENCERRADO e TAKE3
                 filteredSignals = allSignals.filter(signal => {
                     const status = (signal.status || 'PENDING').toUpperCase();
-                    return status !== 'ENCERRADO';
+                    return status !== 'ENCERRADO' && status !== 'TAKE3';
                 });
             } else {
-                // Sinais encerrados
+                // Sinais encerrados: ENCERRADO ou TAKE3
                 filteredSignals = allSignals.filter(signal => {
                     const status = (signal.status || 'PENDING').toUpperCase();
-                    return status === 'ENCERRADO';
+                    return status === 'ENCERRADO' || status === 'TAKE3';
                 });
             }
 
