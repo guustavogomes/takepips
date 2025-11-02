@@ -1094,6 +1094,15 @@
             const btn = document.getElementById('notificationsBtn');
             if (!btn) return;
             
+            const support = checkPushNotificationSupport();
+            if (!support.supported) {
+                btn.innerHTML = '<span>⚠️ Não Suportado</span>';
+                btn.style.background = 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)';
+                btn.disabled = true;
+                btn.title = support.reason + ' ' + support.suggestion;
+                return;
+            }
+            
             const permission = Notification.permission;
             if (permission === 'granted') {
                 btn.innerHTML = '<span>✅ Notificações Ativas</span>';
@@ -1108,10 +1117,74 @@
             }
         }
 
+        // Verificar suporte completo a notificações push
+        function checkPushNotificationSupport() {
+            // Verificar se é Safari
+            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            
+            // Verificar suporte básico
+            if (!('Notification' in window)) {
+                return {
+                    supported: false,
+                    reason: 'Seu navegador não suporta notificações básicas.',
+                    suggestion: 'Use Chrome, Firefox, Edge ou Safari 16+ no macOS.'
+                };
+            }
+            
+            // Verificar Service Worker
+            if (!('serviceWorker' in navigator)) {
+                return {
+                    supported: false,
+                    reason: 'Service Worker não está disponível.',
+                    suggestion: 'Use um navegador moderno que suporte Service Workers.'
+                };
+            }
+            
+            // Verificar Push Manager
+            if (!('PushManager' in window)) {
+                return {
+                    supported: false,
+                    reason: 'Push Manager não está disponível.',
+                    suggestion: isSafari && isIOS 
+                        ? 'Safari no iOS não suporta notificações push. Use Safari no macOS ou outro navegador.'
+                        : 'Use um navegador moderno com suporte completo a Web Push.'
+                };
+            }
+            
+            // Safari no macOS: verificar versão mínima (16.0+)
+            if (isSafari && !isIOS) {
+                const safariVersion = navigator.userAgent.match(/Version\/(\d+)/);
+                if (safariVersion && parseInt(safariVersion[1]) < 16) {
+                    return {
+                        supported: false,
+                        reason: 'Safari muito antigo.',
+                        suggestion: 'Atualize o Safari para versão 16.0 ou superior, ou use outro navegador.'
+                    };
+                }
+            }
+            
+            // Safari no iOS não suporta Web Push nativamente
+            if (isSafari && isIOS) {
+                return {
+                    supported: false,
+                    reason: 'Safari no iOS não suporta notificações push web.',
+                    suggestion: 'Use Safari no macOS (versão 16.0+), Chrome, Firefox ou Edge.'
+                };
+            }
+            
+            return {
+                supported: true,
+                browser: isSafari ? 'Safari' : 'Outro'
+            };
+        }
+
         // Solicitar permissão de notificação
         async function requestNotificationPermission() {
-            if (!('Notification' in window)) {
-                alert('❌ Seu navegador não suporta notificações');
+            const support = checkPushNotificationSupport();
+            
+            if (!support.supported) {
+                alert(`❌ ${support.reason}\n\n💡 ${support.suggestion}`);
                 return;
             }
 
@@ -1134,6 +1207,13 @@
 
         // Inscrever para receber push notifications
         async function subscribeToPush() {
+            const support = checkPushNotificationSupport();
+            
+            if (!support.supported) {
+                console.error('❌ Push notifications não suportadas:', support.reason);
+                return;
+            }
+            
             if (!('serviceWorker' in navigator)) {
                 console.log('❌ Service Worker não disponível');
                 return;
@@ -1251,8 +1331,10 @@
 
         // Função para solicitar permissão manualmente (pode ser chamada por um botão)
         window.requestNotificationPermission = async () => {
-            if (!('Notification' in window)) {
-                alert('❌ Seu navegador não suporta notificações');
+            const support = checkPushNotificationSupport();
+            
+            if (!support.supported) {
+                alert(`❌ ${support.reason}\n\n💡 ${support.suggestion}`);
                 return;
             }
 
