@@ -209,3 +209,34 @@ export async function notifySignalUpdate(
   });
 }
 
+/**
+ * Enviar notificação quando os valores de um sinal são atualizados (entry, stops, takes)
+ */
+export async function notifySignalDataUpdate(
+  signalType: 'BUY' | 'SELL',
+  symbol: string,
+  entry: number,
+  stopLoss: number,
+  take1: number
+): Promise<void> {
+  console.log('[PUSH] notifySignalDataUpdate chamado:', { signalType, symbol, entry, stopLoss, take1 });
+  
+  const emoji = signalType === 'BUY' ? '📈' : '📉';
+  const title = `🔄 ${emoji} Sinal ${signalType} Atualizado - ${symbol}`;
+  const body = `Entry: ${entry.toFixed(2)} | Stop: ${stopLoss.toFixed(2)} | Take1: ${take1.toFixed(2)}`;
+
+  console.log('[PUSH] Preparando notificação de atualização:', { title, body });
+
+  await sendPushNotification(title, body, {
+    signalType,
+    symbol,
+    entry,
+    stopLoss,
+    take1,
+    event: 'SIGNAL_DATA_UPDATE',
+    timestamp: new Date().toISOString(),
+  });
+  
+  console.log('[PUSH] notifySignalDataUpdate concluído');
+}
+

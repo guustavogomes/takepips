@@ -137,6 +137,16 @@ export class SignalRepository implements ISignalRepository {
         RETURNING *
       `;
       params = [status, now.toISOString(), hitPrice.toString(), now.toISOString(), id];
+    } else if (status === 'ENCERRADO') {
+      // Para status ENCERRADO, apenas atualiza o status (não precisa de hitPrice)
+      query = `
+        UPDATE signals 
+        SET status = $1, 
+            updated_at = $2
+        WHERE id = $3
+        RETURNING *
+      `;
+      params = [status, now.toISOString(), id];
     } else {
       throw new Error(`Status inválido para atualização: ${status}`);
     }
@@ -145,6 +155,84 @@ export class SignalRepository implements ISignalRepository {
 
     if (!result || result.length === 0) {
       throw new Error('Sinal não encontrado ou falha ao atualizar status');
+    }
+
+    return this.mapRowToSignal(result[0]);
+  }
+
+  async update(
+    id: string,
+    data: {
+      entry?: number;
+      stopLoss?: number;
+      take1?: number;
+      take2?: number;
+      take3?: number;
+      stopTicks?: number;
+    }
+  ): Promise<Signal> {
+    const now = new Date();
+    const updates: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (data.entry !== undefined) {
+      updates.push(`entry = $${paramIndex}`);
+      params.push(data.entry.toString());
+      paramIndex++;
+    }
+
+    if (data.stopLoss !== undefined) {
+      updates.push(`stop_loss = $${paramIndex}`);
+      params.push(data.stopLoss.toString());
+      paramIndex++;
+    }
+
+    if (data.take1 !== undefined) {
+      updates.push(`take1 = $${paramIndex}`);
+      params.push(data.take1.toString());
+      paramIndex++;
+    }
+
+    if (data.take2 !== undefined) {
+      updates.push(`take2 = $${paramIndex}`);
+      params.push(data.take2.toString());
+      paramIndex++;
+    }
+
+    if (data.take3 !== undefined) {
+      updates.push(`take3 = $${paramIndex}`);
+      params.push(data.take3.toString());
+      paramIndex++;
+    }
+
+    if (data.stopTicks !== undefined) {
+      updates.push(`stop_ticks = $${paramIndex}`);
+      params.push(data.stopTicks);
+      paramIndex++;
+    }
+
+    if (updates.length === 0) {
+      throw new Error('Nenhum campo fornecido para atualização');
+    }
+
+    updates.push(`updated_at = $${paramIndex}`);
+    params.push(now.toISOString());
+    paramIndex++;
+
+    params.push(id);
+
+    const query = `
+      UPDATE signals 
+      SET ${updates.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING *
+    `;
+
+    const result = await this.sql(query, params) as Record<string, any>[];
+
+    if (!result || result.length === 0) {
+      throw new Error('Sinal não encontrado ou falha ao atualizar');
     }
 
     return this.mapRowToSignal(result[0]);

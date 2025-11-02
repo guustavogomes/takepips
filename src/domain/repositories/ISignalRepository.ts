@@ -37,12 +37,30 @@ export interface ISignalRepository {
   findBySymbol(symbol: string, limit?: number): Promise<Signal[]>;
 
   /**
-   * Atualiza o status de um sinal (quando atinge stop loss ou take)
+   * Atualiza o status de um sinal (quando atinge stop loss ou take, ou é encerrado)
    * @param id ID do sinal
-   * @param status Novo status (STOP_LOSS, TAKE1, TAKE2, TAKE3)
-   * @param hitPrice Preço exato quando o nível foi atingido
+   * @param status Novo status (STOP_LOSS, TAKE1, TAKE2, TAKE3, ENCERRADO)
+   * @param hitPrice Preço exato quando o nível foi atingido (ignorado para ENCERRADO)
    * @returns Promise com o sinal atualizado
    */
   updateStatus(id: string, status: SignalStatus, hitPrice: number): Promise<Signal>;
+
+  /**
+   * Atualiza os valores de um sinal (entry, stopLoss, takes, etc)
+   * @param id ID do sinal
+   * @param data Dados parciais para atualização
+   * @returns Promise com o sinal atualizado
+   */
+  update(
+    id: string,
+    data: {
+      entry?: number;
+      stopLoss?: number;
+      take1?: number;
+      take2?: number;
+      take3?: number;
+      stopTicks?: number;
+    }
+  ): Promise<Signal>;
 }
 

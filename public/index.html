@@ -470,6 +470,18 @@
             border-color: var(--border-color);
         }
 
+        /* Cards encerrados - fundo cinza/desativado */
+        .signal-card.status-encerrado {
+            background: linear-gradient(135deg, rgba(100, 116, 139, 0.15) 0%, rgba(100, 116, 139, 0.05) 100%);
+            border-color: rgba(100, 116, 139, 0.5);
+            opacity: 0.7;
+        }
+
+        .signal-card.status-encerrado::before {
+            background: #64748b;
+            height: 6px;
+        }
+
         .signal-card:hover {
             transform: translateY(-8px) scale(1.02);
             border-color: var(--primary-color);
@@ -864,7 +876,9 @@
                 'TAKE2': 'Take 2',
                 'take2': 'Take 2',
                 'TAKE3': 'Take 3',
-                'take3': 'Take 3'
+                'take3': 'Take 3',
+                'ENCERRADO': 'Encerrado',
+                'encerrado': 'Encerrado'
             };
             
             return statusMap[status.toUpperCase()] || statusMap[status] || status;
@@ -903,9 +917,10 @@
         function updateStats(signals) {
             const total = signals.length;
             // Normalizar comparações para aceitar diferentes formatos
+            // Excluir sinais encerrados da contagem de pendentes
             const pending = signals.filter(s => {
                 const status = (s.status || 'PENDING').toUpperCase();
-                return status === 'PENDING';
+                return status === 'PENDING' && status !== 'ENCERRADO';
             }).length;
             
             const stopLoss = signals.filter(s => {

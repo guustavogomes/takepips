@@ -13,8 +13,27 @@
 //--- Inputs
 input string EndpointURL = "https://takepips.vercel.app/api/signals"; // URL do endpoint
 input bool   AutoSendSignals = true; // Enviar sinais automaticamente quando preço atingir linhas
-input bool   TestConnectionOnStart = true; // Testar conexão ao iniciar
+input bool   TestConnectionOnStart = false; // Testar conexão ao iniciar
 input double PriceTolerance = 0.0001; // Tolerância para considerar que preço atingiu a linha
+
+//--- Cores personalizáveis
+input color   BuyEntryColor = clrLime; // Cor da linha de entrada BUY
+input color   BuyStopColor = clrRed; // Cor da linha de stop loss BUY
+input color   BuyTake1Color = clrBlue; // Cor da linha de take 1 BUY
+input color   BuyTake2Color = clrCyan; // Cor da linha de take 2 BUY
+input color   BuyTake3Color = clrYellow; // Cor da linha de take 3 BUY
+
+input color   SellEntryColor = clrRed; // Cor da linha de entrada SELL
+input color   SellStopColor = clrRed; // Cor da linha de stop loss SELL
+input color   SellTake1Color = clrBlue; // Cor da linha de take 1 SELL
+input color   SellTake2Color = clrCyan; // Cor da linha de take 2 SELL
+input color   SellTake3Color = clrYellow; // Cor da linha de take 3 SELL
+
+//--- Controle de acesso (contas autorizadas e período de validade)
+long AuthorizedAccounts[] = {564998, 10184374, 9936253}; // Contas autorizadas
+datetime LicenseStartDate = D'2024.11.02 00:00:00'; // Data de início da licença
+int LicenseDays = 454; // Período de validade em dias (expira em 30/01/2026)
+bool EAEnabled = false; // Flag para controlar se o EA está habilitado
 
 //--- Variáveis globais para linhas
 string LinePrefix = "TakePips_EA_";
@@ -29,6 +48,8 @@ string SellTake1Line = LinePrefix + "SellTake1";
 string SellTake2Line = LinePrefix + "SellTake2";
 string SellTake3Line = LinePrefix + "SellTake3";
 string ButtonName = LinePrefix + "SendButton";
+string UpdateButtonName = LinePrefix + "UpdateButton";
+string ResetButtonName = LinePrefix + "ResetButton";
 
 //--- Variáveis de controle
 bool LinesInitialized = false;
@@ -59,11 +80,75 @@ int OnInit()
    Print("Endpoint URL: ", EndpointURL);
    Print("Auto Send Signals: ", AutoSendSignals);
    
+   // Verificar autorização de conta
+   long currentAccount = AccountInfoInteger(ACCOUNT_LOGIN);
+   Print("Conta atual: ", currentAccount);
+   
+   bool accountAuthorized = false;
+   for(int i = 0; i < ArraySize(AuthorizedAccounts); i++)
+   {
+      if(AuthorizedAccounts[i] == currentAccount)
+      {
+         accountAuthorized = true;
+         Print("✅ Conta autorizada: ", currentAccount);
+         break;
+      }
+   }
+   
+   if(!accountAuthorized)
+   {
+      string errorMsg = "❌ ERRO: Esta conta (" + IntegerToString(currentAccount) + ") não está autorizada!";
+      Print(errorMsg);
+      Alert(errorMsg);
+      Comment(errorMsg);
+      return(INIT_FAILED);
+   }
+   
+   // Verificar período de validade (90 dias)
+   datetime currentTime = TimeCurrent();
+   datetime licenseEndDate = LicenseStartDate + (LicenseDays * 86400); // Adicionar 90 dias em segundos
+   
+   Print("Data de início da licença: ", TimeToString(LicenseStartDate, TIME_DATE|TIME_MINUTES));
+   Print("Data de expiração da licença: ", TimeToString(licenseEndDate, TIME_DATE|TIME_MINUTES));
+   Print("Data atual: ", TimeToString(currentTime, TIME_DATE|TIME_MINUTES));
+   
+   if(currentTime < LicenseStartDate)
+   {
+      string errorMsg = "❌ ERRO: Licença ainda não está ativa. Data de início: " + TimeToString(LicenseStartDate, TIME_DATE);
+      Print(errorMsg);
+      Alert(errorMsg);
+      Comment(errorMsg);
+      return(INIT_FAILED);
+   }
+   
+   if(currentTime > licenseEndDate)
+   {
+      string errorMsg = "❌ ERRO: Licença expirada! Data de expiração: " + TimeToString(licenseEndDate, TIME_DATE);
+      Print(errorMsg);
+      Alert(errorMsg);
+      Comment(errorMsg);
+      return(INIT_FAILED);
+   }
+   
+   // Calcular dias restantes
+   int daysRemaining = (int)((licenseEndDate - currentTime) / 86400);
+   Print("✅ Licença válida. Dias restantes: ", daysRemaining);
+   
+   EAEnabled = true;
+   
+   // Limpar qualquer mensagem anterior no gráfico
+   Comment("");
+   
    // Criar linhas se não existirem
    CreateLinesIfNeeded();
    
-   // Criar botão de envio
+   // Atualizar cores das linhas existentes para refletir configurações personalizadas
+   UpdateLineColors();
+   
+   // Criar botões
    CreateSendButton();
+   CreateUpdateButton();
+   CreateResetButton();
    
    if(TestConnectionOnStart)
    {
@@ -110,8 +195,10 @@ void OnDeinit(const int reason)
    ObjectDelete(0, SellTake2Line + "_Label");
    ObjectDelete(0, SellTake3Line + "_Label");
    
-   // Deletar botão
+   // Deletar botões
    ObjectDelete(0, ButtonName);
+   ObjectDelete(0, UpdateButtonName);
+   ObjectDelete(0, ResetButtonName);
    
    // Redesenhar gráfico para remover os objetos
    ChartRedraw();
@@ -133,6 +220,14 @@ void OnChartEvent(const int id,
       {
          OnSendButtonClick();
       }
+      else if(sparam == UpdateButtonName)
+      {
+         OnUpdateButtonClick();
+      }
+      else if(sparam == ResetButtonName)
+      {
+         OnResetButtonClick();
+      }
    }
    
    if(id == CHARTEVENT_OBJECT_DRAG)
@@ -153,6 +248,7 @@ void OnChartEvent(const int id,
          UpdateAllLabels();
       }
    }
+   
 }
 
 //+------------------------------------------------------------------+
@@ -160,9 +256,32 @@ void OnChartEvent(const int id,
 //+------------------------------------------------------------------+
 void OnTick()
 {
+   // Verificar se EA está habilitado
+   if(!EAEnabled)
+      return;
+   
+   // Verificar novamente se a licença ainda está válida (a cada hora)
+   static datetime lastLicenseCheck = 0;
+   datetime currentTime = TimeCurrent();
+   
+   if(currentTime - lastLicenseCheck >= 3600) // Verificar a cada hora
+   {
+      datetime licenseEndDate = LicenseStartDate + (LicenseDays * 86400);
+      if(currentTime > licenseEndDate)
+      {
+         string errorMsg = "❌ Licença expirada! Data de expiração: " + TimeToString(licenseEndDate, TIME_DATE);
+         Print(errorMsg);
+         Alert(errorMsg);
+         Comment(errorMsg);
+         EAEnabled = false;
+         ExpertRemove(); // Remover o EA do gráfico
+         return;
+      }
+      lastLicenseCheck = currentTime;
+   }
+   
    // Atualizar labels periodicamente (a cada segundo)
    static datetime lastLabelUpdate = 0;
-   datetime currentTime = TimeCurrent();
    
    if(LinesInitialized && currentTime != lastLabelUpdate)
    {
@@ -250,11 +369,11 @@ void CreateLinesIfNeeded()
    // ========== LINHAS PARA COMPRA (BUY) ==========
    // Ordem de cima para baixo: Take3, Take2, Take1, Entry, Stop
    
-   // Take 3 para compra (amarelo) - mais alto
+   // Take 3 para compra - mais alto
    if(ObjectFind(0, BuyTake3Line) < 0)
    {
       ObjectCreate(0, BuyTake3Line, OBJ_HLINE, 0, 0, price + 4 * minSpacing);
-      ObjectSetInteger(0, BuyTake3Line, OBJPROP_COLOR, clrYellow);
+      ObjectSetInteger(0, BuyTake3Line, OBJPROP_COLOR, BuyTake3Color);
       ObjectSetInteger(0, BuyTake3Line, OBJPROP_STYLE, STYLE_DOT);
       ObjectSetInteger(0, BuyTake3Line, OBJPROP_WIDTH, 1);
       ObjectSetInteger(0, BuyTake3Line, OBJPROP_BACK, false);
@@ -262,11 +381,11 @@ void CreateLinesIfNeeded()
       ObjectSetString(0, BuyTake3Line, OBJPROP_TEXT, "BUY Take 3");
    }
    
-   // Take 2 para compra (ciano)
+   // Take 2 para compra
    if(ObjectFind(0, BuyTake2Line) < 0)
    {
       ObjectCreate(0, BuyTake2Line, OBJ_HLINE, 0, 0, price + 3 * minSpacing);
-      ObjectSetInteger(0, BuyTake2Line, OBJPROP_COLOR, clrCyan);
+      ObjectSetInteger(0, BuyTake2Line, OBJPROP_COLOR, BuyTake2Color);
       ObjectSetInteger(0, BuyTake2Line, OBJPROP_STYLE, STYLE_DOT);
       ObjectSetInteger(0, BuyTake2Line, OBJPROP_WIDTH, 1);
       ObjectSetInteger(0, BuyTake2Line, OBJPROP_BACK, false);
@@ -274,11 +393,11 @@ void CreateLinesIfNeeded()
       ObjectSetString(0, BuyTake2Line, OBJPROP_TEXT, "BUY Take 2");
    }
    
-   // Take 1 para compra (azul)
+   // Take 1 para compra
    if(ObjectFind(0, BuyTake1Line) < 0)
    {
       ObjectCreate(0, BuyTake1Line, OBJ_HLINE, 0, 0, price + 2 * minSpacing);
-      ObjectSetInteger(0, BuyTake1Line, OBJPROP_COLOR, clrBlue);
+      ObjectSetInteger(0, BuyTake1Line, OBJPROP_COLOR, BuyTake1Color);
       ObjectSetInteger(0, BuyTake1Line, OBJPROP_STYLE, STYLE_DOT);
       ObjectSetInteger(0, BuyTake1Line, OBJPROP_WIDTH, 1);
       ObjectSetInteger(0, BuyTake1Line, OBJPROP_BACK, false);
@@ -286,11 +405,11 @@ void CreateLinesIfNeeded()
       ObjectSetString(0, BuyTake1Line, OBJPROP_TEXT, "BUY Take 1");
    }
    
-   // Linha de entrada para compra (verde)
+   // Linha de entrada para compra
    if(ObjectFind(0, BuyEntryLine) < 0)
    {
       ObjectCreate(0, BuyEntryLine, OBJ_HLINE, 0, 0, price);
-      ObjectSetInteger(0, BuyEntryLine, OBJPROP_COLOR, clrLime);
+      ObjectSetInteger(0, BuyEntryLine, OBJPROP_COLOR, BuyEntryColor);
       ObjectSetInteger(0, BuyEntryLine, OBJPROP_STYLE, STYLE_SOLID);
       ObjectSetInteger(0, BuyEntryLine, OBJPROP_WIDTH, 2);
       ObjectSetInteger(0, BuyEntryLine, OBJPROP_BACK, false);
@@ -298,11 +417,11 @@ void CreateLinesIfNeeded()
       ObjectSetString(0, BuyEntryLine, OBJPROP_TEXT, "BUY Entry");
    }
    
-   // Stop Loss para compra (vermelha tracejada) - mais baixo
+   // Stop Loss para compra - mais baixo
    if(ObjectFind(0, BuyStopLossLine) < 0)
    {
       ObjectCreate(0, BuyStopLossLine, OBJ_HLINE, 0, 0, price - minSpacing);
-      ObjectSetInteger(0, BuyStopLossLine, OBJPROP_COLOR, clrRed);
+      ObjectSetInteger(0, BuyStopLossLine, OBJPROP_COLOR, BuyStopColor);
       ObjectSetInteger(0, BuyStopLossLine, OBJPROP_STYLE, STYLE_DASH);
       ObjectSetInteger(0, BuyStopLossLine, OBJPROP_WIDTH, 2);
       ObjectSetInteger(0, BuyStopLossLine, OBJPROP_BACK, false);
@@ -313,11 +432,11 @@ void CreateLinesIfNeeded()
    // ========== LINHAS PARA VENDA (SELL) ==========
    // Ordem de cima para baixo: Stop, Entry, Take1, Take2, Take3
    
-   // Stop Loss para venda (vermelha tracejada) - mais alto
+   // Stop Loss para venda - mais alto
    if(ObjectFind(0, SellStopLossLine) < 0)
    {
       ObjectCreate(0, SellStopLossLine, OBJ_HLINE, 0, 0, price + minSpacing);
-      ObjectSetInteger(0, SellStopLossLine, OBJPROP_COLOR, clrRed);
+      ObjectSetInteger(0, SellStopLossLine, OBJPROP_COLOR, SellStopColor);
       ObjectSetInteger(0, SellStopLossLine, OBJPROP_STYLE, STYLE_DASH);
       ObjectSetInteger(0, SellStopLossLine, OBJPROP_WIDTH, 2);
       ObjectSetInteger(0, SellStopLossLine, OBJPROP_BACK, false);
@@ -325,11 +444,11 @@ void CreateLinesIfNeeded()
       ObjectSetString(0, SellStopLossLine, OBJPROP_TEXT, "SELL Stop Loss");
    }
    
-   // Linha de entrada para venda (vermelha)
+   // Linha de entrada para venda
    if(ObjectFind(0, SellEntryLine) < 0)
    {
       ObjectCreate(0, SellEntryLine, OBJ_HLINE, 0, 0, price);
-      ObjectSetInteger(0, SellEntryLine, OBJPROP_COLOR, clrRed);
+      ObjectSetInteger(0, SellEntryLine, OBJPROP_COLOR, SellEntryColor);
       ObjectSetInteger(0, SellEntryLine, OBJPROP_STYLE, STYLE_SOLID);
       ObjectSetInteger(0, SellEntryLine, OBJPROP_WIDTH, 2);
       ObjectSetInteger(0, SellEntryLine, OBJPROP_BACK, false);
@@ -341,7 +460,7 @@ void CreateLinesIfNeeded()
    if(ObjectFind(0, SellTake1Line) < 0)
    {
       ObjectCreate(0, SellTake1Line, OBJ_HLINE, 0, 0, price - 2 * minSpacing);
-      ObjectSetInteger(0, SellTake1Line, OBJPROP_COLOR, clrBlue);
+      ObjectSetInteger(0, SellTake1Line, OBJPROP_COLOR, SellTake1Color);
       ObjectSetInteger(0, SellTake1Line, OBJPROP_STYLE, STYLE_DOT);
       ObjectSetInteger(0, SellTake1Line, OBJPROP_WIDTH, 1);
       ObjectSetInteger(0, SellTake1Line, OBJPROP_BACK, false);
@@ -349,11 +468,11 @@ void CreateLinesIfNeeded()
       ObjectSetString(0, SellTake1Line, OBJPROP_TEXT, "SELL Take 1");
    }
    
-   // Take 2 para venda (ciano)
+   // Take 2 para venda
    if(ObjectFind(0, SellTake2Line) < 0)
    {
       ObjectCreate(0, SellTake2Line, OBJ_HLINE, 0, 0, price - 3 * minSpacing);
-      ObjectSetInteger(0, SellTake2Line, OBJPROP_COLOR, clrCyan);
+      ObjectSetInteger(0, SellTake2Line, OBJPROP_COLOR, SellTake2Color);
       ObjectSetInteger(0, SellTake2Line, OBJPROP_STYLE, STYLE_DOT);
       ObjectSetInteger(0, SellTake2Line, OBJPROP_WIDTH, 1);
       ObjectSetInteger(0, SellTake2Line, OBJPROP_BACK, false);
@@ -361,11 +480,11 @@ void CreateLinesIfNeeded()
       ObjectSetString(0, SellTake2Line, OBJPROP_TEXT, "SELL Take 2");
    }
    
-   // Take 3 para venda (amarelo) - mais baixo
+   // Take 3 para venda - mais baixo
    if(ObjectFind(0, SellTake3Line) < 0)
    {
       ObjectCreate(0, SellTake3Line, OBJ_HLINE, 0, 0, price - 4 * minSpacing);
-      ObjectSetInteger(0, SellTake3Line, OBJPROP_COLOR, clrYellow);
+      ObjectSetInteger(0, SellTake3Line, OBJPROP_COLOR, SellTake3Color);
       ObjectSetInteger(0, SellTake3Line, OBJPROP_STYLE, STYLE_DOT);
       ObjectSetInteger(0, SellTake3Line, OBJPROP_WIDTH, 1);
       ObjectSetInteger(0, SellTake3Line, OBJPROP_BACK, false);
@@ -483,19 +602,49 @@ void CreateLineLabel(string lineName, string labelText, color labelColor)
 //+------------------------------------------------------------------+
 void UpdateAllLabels()
 {
-   // Labels para BUY
-   CreateLineLabel(BuyEntryLine, "BUY Entry", clrLime);
-   CreateLineLabel(BuyStopLossLine, "BUY Stop", clrRed);
-   CreateLineLabel(BuyTake1Line, "BUY Take 1", clrBlue);
-   CreateLineLabel(BuyTake2Line, "BUY Take 2", clrCyan);
-   CreateLineLabel(BuyTake3Line, "BUY Take 3", clrYellow);
+   // Labels para BUY (usando cores personalizadas)
+   CreateLineLabel(BuyEntryLine, "BUY Entry", BuyEntryColor);
+   CreateLineLabel(BuyStopLossLine, "BUY Stop", BuyStopColor);
+   CreateLineLabel(BuyTake1Line, "BUY Take 1", BuyTake1Color);
+   CreateLineLabel(BuyTake2Line, "BUY Take 2", BuyTake2Color);
+   CreateLineLabel(BuyTake3Line, "BUY Take 3", BuyTake3Color);
    
-   // Labels para SELL
-   CreateLineLabel(SellEntryLine, "SELL Entry", clrRed);
-   CreateLineLabel(SellStopLossLine, "SELL Stop", clrRed);
-   CreateLineLabel(SellTake1Line, "SELL Take 1", clrBlue);
-   CreateLineLabel(SellTake2Line, "SELL Take 2", clrCyan);
-   CreateLineLabel(SellTake3Line, "SELL Take 3", clrYellow);
+   // Labels para SELL (usando cores personalizadas)
+   CreateLineLabel(SellEntryLine, "SELL Entry", SellEntryColor);
+   CreateLineLabel(SellStopLossLine, "SELL Stop", SellStopColor);
+   CreateLineLabel(SellTake1Line, "SELL Take 1", SellTake1Color);
+   CreateLineLabel(SellTake2Line, "SELL Take 2", SellTake2Color);
+   CreateLineLabel(SellTake3Line, "SELL Take 3", SellTake3Color);
+}
+
+//+------------------------------------------------------------------+
+//| Atualizar cores das linhas com configurações personalizadas     |
+//+------------------------------------------------------------------+
+void UpdateLineColors()
+{
+   // Atualizar cores das linhas BUY se existirem
+   if(ObjectFind(0, BuyEntryLine) >= 0)
+      ObjectSetInteger(0, BuyEntryLine, OBJPROP_COLOR, BuyEntryColor);
+   if(ObjectFind(0, BuyStopLossLine) >= 0)
+      ObjectSetInteger(0, BuyStopLossLine, OBJPROP_COLOR, BuyStopColor);
+   if(ObjectFind(0, BuyTake1Line) >= 0)
+      ObjectSetInteger(0, BuyTake1Line, OBJPROP_COLOR, BuyTake1Color);
+   if(ObjectFind(0, BuyTake2Line) >= 0)
+      ObjectSetInteger(0, BuyTake2Line, OBJPROP_COLOR, BuyTake2Color);
+   if(ObjectFind(0, BuyTake3Line) >= 0)
+      ObjectSetInteger(0, BuyTake3Line, OBJPROP_COLOR, BuyTake3Color);
+   
+   // Atualizar cores das linhas SELL se existirem
+   if(ObjectFind(0, SellEntryLine) >= 0)
+      ObjectSetInteger(0, SellEntryLine, OBJPROP_COLOR, SellEntryColor);
+   if(ObjectFind(0, SellStopLossLine) >= 0)
+      ObjectSetInteger(0, SellStopLossLine, OBJPROP_COLOR, SellStopColor);
+   if(ObjectFind(0, SellTake1Line) >= 0)
+      ObjectSetInteger(0, SellTake1Line, OBJPROP_COLOR, SellTake1Color);
+   if(ObjectFind(0, SellTake2Line) >= 0)
+      ObjectSetInteger(0, SellTake2Line, OBJPROP_COLOR, SellTake2Color);
+   if(ObjectFind(0, SellTake3Line) >= 0)
+      ObjectSetInteger(0, SellTake3Line, OBJPROP_COLOR, SellTake3Color);
 }
 
 //+------------------------------------------------------------------+
@@ -528,10 +677,245 @@ void CreateSendButton()
 }
 
 //+------------------------------------------------------------------+
+//| Criar botão de atualização                                       |
+//+------------------------------------------------------------------+
+void CreateUpdateButton()
+{
+   int x = 170; // Ao lado do botão de envio
+   int y = 30;
+   int width = 150;
+   int height = 30;
+   
+   if(ObjectFind(0, UpdateButtonName) < 0)
+   {
+      ObjectCreate(0, UpdateButtonName, OBJ_BUTTON, 0, 0, 0);
+      ObjectSetInteger(0, UpdateButtonName, OBJPROP_XDISTANCE, x);
+      ObjectSetInteger(0, UpdateButtonName, OBJPROP_YDISTANCE, y);
+      ObjectSetInteger(0, UpdateButtonName, OBJPROP_XSIZE, width);
+      ObjectSetInteger(0, UpdateButtonName, OBJPROP_YSIZE, height);
+      ObjectSetInteger(0, UpdateButtonName, OBJPROP_BGCOLOR, clrOrange);
+      ObjectSetInteger(0, UpdateButtonName, OBJPROP_COLOR, clrWhite);
+      ObjectSetInteger(0, UpdateButtonName, OBJPROP_BORDER_COLOR, clrWhite);
+      ObjectSetInteger(0, UpdateButtonName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
+      ObjectSetString(0, UpdateButtonName, OBJPROP_TEXT, "Atualizar Sinal");
+      ObjectSetInteger(0, UpdateButtonName, OBJPROP_FONTSIZE, 10);
+      ObjectSetInteger(0, UpdateButtonName, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, UpdateButtonName, OBJPROP_HIDDEN, true);
+      ChartRedraw();
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Manipulador de clique no botão de atualização                    |
+//+------------------------------------------------------------------+
+void OnUpdateButtonClick()
+{
+   if(!EAEnabled)
+   {
+      Alert("❌ EA não está habilitado. Verifique a autorização da conta e validade da licença.");
+      Print("❌ Tentativa de atualização bloqueada. EA não habilitado.");
+      return;
+   }
+   
+   if(BuySignalId == "" && SellSignalId == "")
+   {
+      Alert("⚠️ Nenhum sinal foi enviado ainda.\n\nPrimeiro envie um sinal usando o botão 'Enviar Sinal'.");
+      Print("⚠️ Tentativa de atualizar sem sinal enviado.");
+      return;
+   }
+   
+   Print("📝 Atualizando sinais...");
+   UpdateSignalFromLines();
+   
+   if(BuySignalId != "" && SellSignalId != "")
+   {
+      Alert("✅ Sinais BUY e SELL atualizados com sucesso!");
+   }
+   else if(BuySignalId != "")
+   {
+      Alert("✅ Sinal BUY atualizado com sucesso!");
+   }
+   else if(SellSignalId != "")
+   {
+      Alert("✅ Sinal SELL atualizado com sucesso!");
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Criar botão de reset                                             |
+//+------------------------------------------------------------------+
+void CreateResetButton()
+{
+   int x = 330; // Ao lado do botão de atualização
+   int y = 30;
+   int width = 120;
+   int height = 30;
+   
+   if(ObjectFind(0, ResetButtonName) < 0)
+   {
+      ObjectCreate(0, ResetButtonName, OBJ_BUTTON, 0, 0, 0);
+      ObjectSetInteger(0, ResetButtonName, OBJPROP_XDISTANCE, x);
+      ObjectSetInteger(0, ResetButtonName, OBJPROP_YDISTANCE, y);
+      ObjectSetInteger(0, ResetButtonName, OBJPROP_XSIZE, width);
+      ObjectSetInteger(0, ResetButtonName, OBJPROP_YSIZE, height);
+      ObjectSetInteger(0, ResetButtonName, OBJPROP_BGCOLOR, clrDarkRed);
+      ObjectSetInteger(0, ResetButtonName, OBJPROP_COLOR, clrWhite);
+      ObjectSetInteger(0, ResetButtonName, OBJPROP_BORDER_COLOR, clrWhite);
+      ObjectSetInteger(0, ResetButtonName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
+      ObjectSetString(0, ResetButtonName, OBJPROP_TEXT, "Resetar");
+      ObjectSetInteger(0, ResetButtonName, OBJPROP_FONTSIZE, 10);
+      ObjectSetInteger(0, ResetButtonName, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, ResetButtonName, OBJPROP_HIDDEN, true);
+      ChartRedraw();
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Manipulador de clique no botão de reset                           |
+//+------------------------------------------------------------------+
+void OnResetButtonClick()
+{
+   if(!EAEnabled)
+   {
+      Alert("❌ EA não está habilitado. Verifique a autorização da conta e validade da licença.");
+      Print("❌ Tentativa de reset bloqueada. EA não habilitado.");
+      return;
+   }
+   
+   if(BuySignalId == "" && SellSignalId == "")
+   {
+      Alert("⚠️ Nenhum sinal está sendo monitorado.\n\nNão há nada para resetar.");
+      Print("⚠️ Tentativa de reset sem sinais ativos.");
+      return;
+   }
+   
+   // Confirmar com usuário
+   if(MessageBox("Deseja realmente resetar o monitoramento?\n\nIsso encerrará o(s) sinal(is) e parará o monitoramento.", 
+                 "Confirmar Reset", MB_YESNO | MB_ICONQUESTION) != IDYES)
+   {
+      Print("Reset cancelado pelo usuário.");
+      return;
+   }
+   
+   Print("🔄 Resetando monitoramento de sinais...");
+   
+   // Encerrar sinal BUY se existir
+   if(BuySignalId != "")
+   {
+      EncerrarSignal(BuySignalId);
+      BuySignalId = "";
+      BuyEntryHit = false;
+      BuyStopHit = false;
+      BuyTake1Hit = false;
+      BuyTake2Hit = false;
+      BuyTake3Hit = false;
+      BuySignalSent = false;
+      Print("✅ Sinal BUY resetado");
+   }
+   
+   // Encerrar sinal SELL se existir
+   if(SellSignalId != "")
+   {
+      EncerrarSignal(SellSignalId);
+      SellSignalId = "";
+      SellEntryHit = false;
+      SellStopHit = false;
+      SellTake1Hit = false;
+      SellTake2Hit = false;
+      SellTake3Hit = false;
+      SellSignalSent = false;
+      Print("✅ Sinal SELL resetado");
+   }
+   
+   Alert("✅ Monitoramento resetado!\n\nOs sinais foram encerrados e você pode enviar novos sinais.");
+}
+
+//+------------------------------------------------------------------+
+//| Encerrar sinal na API                                             |
+//+------------------------------------------------------------------+
+void EncerrarSignal(string signalId)
+{
+   if(signalId == "")
+   {
+      Print("❌ Tentativa de encerrar sinal com ID vazio");
+      return;
+   }
+   
+   Print("🛑 Encerrando sinal ", signalId, " na API...");
+   
+   // Preparar URL do endpoint de encerramento
+   string encerrarUrl = EndpointURL;
+   // Substituir "/signals" por "/signals/" + signalId + "/encerrar"
+   int signalsPos = StringFind(encerrarUrl, "/signals");
+   if(signalsPos != -1)
+   {
+      // Extrair base URL (até /api) e adicionar /signals/[id]/encerrar
+      int apiPos = StringFind(encerrarUrl, "/api");
+      if(apiPos != -1)
+      {
+         encerrarUrl = StringSubstr(encerrarUrl, 0, apiPos) + "/api/signals/" + signalId + "/encerrar";
+      }
+      else
+      {
+         encerrarUrl = "https://takepips.vercel.app/api/signals/" + signalId + "/encerrar";
+      }
+   }
+   else
+   {
+      encerrarUrl = "https://takepips.vercel.app/api/signals/" + signalId + "/encerrar";
+   }
+   
+   // Preparar cabeçalhos HTTP
+   string headers = "";
+   headers = headers + "Content-Type: application/json\r\n";
+   headers = headers + "User-Agent: MetaTrader5\r\n";
+   
+   // Preparar dados (POST vazio, apenas o ID vem na URL)
+   char post[];
+   char result[];
+   string result_headers;
+   
+   ArrayResize(post, 0);
+   ArrayResize(result, 0);
+   
+   // Realizar requisição HTTP POST
+   int timeout = 5000;
+   ResetLastError();
+   int res = WebRequest("POST", encerrarUrl, headers, timeout, post, result, result_headers);
+   
+   if(res == -1)
+   {
+      int error = GetLastError();
+      Print("❌ Erro WebRequest ao encerrar sinal: ", error);
+      Print("URL tentada: ", encerrarUrl);
+      return;
+   }
+   
+   string responseStr = CharArrayToString(result);
+   if(res >= 200 && res < 300)
+   {
+      Print("✅ Sinal encerrado com sucesso!");
+      Print("Resposta: ", responseStr);
+   }
+   else
+   {
+      Print("❌ Erro ao encerrar sinal. Código: ", res);
+      Print("Resposta: ", responseStr);
+   }
+}
+
+//+------------------------------------------------------------------+
 //| Manipulador de clique no botão de envio                         |
 //+------------------------------------------------------------------+
 void OnSendButtonClick()
 {
+   if(!EAEnabled)
+   {
+      Alert("❌ EA não está habilitado. Verifique a autorização da conta e validade da licença.");
+      Print("❌ Tentativa de envio bloqueada. EA não habilitado.");
+      return;
+   }
+   
    Print("📤 Enviando sinais BUY e SELL...");
    
    // ========== ENVIAR SINAL BUY ==========
@@ -597,6 +981,9 @@ void OnSendButtonClick()
       SellSignalId = sellId;
    
    // ========== RESULTADO ==========
+   // Limpar mensagem de erro do gráfico se houver
+   Comment("");
+   
    if(buySuccess && sellSuccess)
    {
       Alert("✅ Ambos os sinais enviados com sucesso!\n\nBUY: ✅\nSELL: ✅");
@@ -624,6 +1011,11 @@ void OnSendButtonClick()
 //+------------------------------------------------------------------+
 void SendBuySignal()
 {
+   if(!EAEnabled)
+   {
+      Print("❌ EA não está habilitado. Envio de sinal BUY bloqueado.");
+      return;
+   }
    double entry = ObjectGetDouble(0, BuyEntryLine, OBJPROP_PRICE);
    double stopLoss = ObjectGetDouble(0, BuyStopLossLine, OBJPROP_PRICE);
    double take1 = ObjectGetDouble(0, BuyTake1Line, OBJPROP_PRICE);
@@ -664,6 +1056,8 @@ void SendBuySignal()
    {
       BuySignalId = signalId;
       Print("✅ Sinal BUY enviado com sucesso! ID: ", signalId);
+      // Limpar mensagem de erro do gráfico
+      Comment("");
       Alert("✅ Sinal BUY enviado para API! ID: " + signalId);
       lastSignalTime = TimeCurrent();
    }
@@ -680,6 +1074,11 @@ void SendBuySignal()
 //+------------------------------------------------------------------+
 void SendSellSignal()
 {
+   if(!EAEnabled)
+   {
+      Print("❌ EA não está habilitado. Envio de sinal SELL bloqueado.");
+      return;
+   }
    double entry = ObjectGetDouble(0, SellEntryLine, OBJPROP_PRICE);
    double stopLoss = ObjectGetDouble(0, SellStopLossLine, OBJPROP_PRICE);
    double take1 = ObjectGetDouble(0, SellTake1Line, OBJPROP_PRICE);
@@ -720,6 +1119,8 @@ void SendSellSignal()
    {
       SellSignalId = signalId;
       Print("✅ Sinal SELL enviado com sucesso! ID: ", signalId);
+      // Limpar mensagem de erro do gráfico
+      Comment("");
       Alert("✅ Sinal SELL enviado para API! ID: " + signalId);
       lastSignalTime = TimeCurrent();
    }
@@ -1305,6 +1706,172 @@ void UpdateSignalStatus(string signalId, string status, double hitPrice)
    else
    {
       Print("❌ Erro ao atualizar status. Código: ", res);
+      Print("Resposta: ", responseStr);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Atualizar sinal quando linhas são arrastadas                    |
+//+------------------------------------------------------------------+
+void UpdateSignalFromLines()
+{
+   if(!EAEnabled)
+      return;
+   
+   // Atualizar sinal BUY se existir
+   if(BuySignalId != "")
+   {
+      double entry = ObjectGetDouble(0, BuyEntryLine, OBJPROP_PRICE);
+      double stopLoss = ObjectGetDouble(0, BuyStopLossLine, OBJPROP_PRICE);
+      double take1 = ObjectGetDouble(0, BuyTake1Line, OBJPROP_PRICE);
+      double take2 = ObjectGetDouble(0, BuyTake2Line, OBJPROP_PRICE);
+      double take3 = ObjectGetDouble(0, BuyTake3Line, OBJPROP_PRICE);
+      
+      if(entry > 0 && stopLoss > 0 && take1 > 0 && take2 > 0 && take3 > 0)
+      {
+         // Calcular stopTicks
+         double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+         int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+         
+         if(tickSize <= 0)
+         {
+            double pointValue = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+            if(digits == 3 || digits == 5)
+               tickSize = pointValue * 10;
+            else
+               tickSize = pointValue;
+         }
+         
+         int stopTicks = (int)MathRound(MathAbs(entry - stopLoss) / tickSize);
+         
+         UpdateSignalData(BuySignalId, entry, stopLoss, take1, take2, take3, stopTicks);
+      }
+   }
+   
+   // Atualizar sinal SELL se existir
+   if(SellSignalId != "")
+   {
+      double entry = ObjectGetDouble(0, SellEntryLine, OBJPROP_PRICE);
+      double stopLoss = ObjectGetDouble(0, SellStopLossLine, OBJPROP_PRICE);
+      double take1 = ObjectGetDouble(0, SellTake1Line, OBJPROP_PRICE);
+      double take2 = ObjectGetDouble(0, SellTake2Line, OBJPROP_PRICE);
+      double take3 = ObjectGetDouble(0, SellTake3Line, OBJPROP_PRICE);
+      
+      if(entry > 0 && stopLoss > 0 && take1 > 0 && take2 > 0 && take3 > 0)
+      {
+         // Calcular stopTicks
+         double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+         int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+         
+         if(tickSize <= 0)
+         {
+            double pointValue = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+            if(digits == 3 || digits == 5)
+               tickSize = pointValue * 10;
+            else
+               tickSize = pointValue;
+         }
+         
+         int stopTicks = (int)MathRound(MathAbs(entry - stopLoss) / tickSize);
+         
+         UpdateSignalData(SellSignalId, entry, stopLoss, take1, take2, take3, stopTicks);
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Atualizar dados do sinal na API                                  |
+//+------------------------------------------------------------------+
+void UpdateSignalData(string signalId, double entry, double stopLoss, 
+                     double take1, double take2, double take3, int stopTicks)
+{
+   if(signalId == "")
+   {
+      Print("❌ Tentativa de atualizar sinal com ID vazio");
+      return;
+   }
+   
+   Print("📝 Atualizando sinal ", signalId, " com novos valores...");
+   
+   // Preparar URL do endpoint de atualização
+   string updateUrl = EndpointURL;
+   // Substituir "/signals" por "/signals/" + signalId
+   int signalsPos = StringFind(updateUrl, "/signals");
+   if(signalsPos != -1)
+   {
+      // Extrair base URL (até /api) e adicionar /signals/[id]
+      int apiPos = StringFind(updateUrl, "/api");
+      if(apiPos != -1)
+      {
+         updateUrl = StringSubstr(updateUrl, 0, apiPos) + "/api/signals/" + signalId;
+      }
+      else
+      {
+         updateUrl = "https://takepips.vercel.app/api/signals/" + signalId;
+      }
+   }
+   else
+   {
+      updateUrl = "https://takepips.vercel.app/api/signals/" + signalId;
+   }
+   
+   int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+   
+   // Preparar JSON
+   string json = "{"
+                 + "\"entry\":" + DoubleToString(entry, digits) + ","
+                 + "\"stopLoss\":" + DoubleToString(stopLoss, digits) + ","
+                 + "\"take1\":" + DoubleToString(take1, digits) + ","
+                 + "\"take2\":" + DoubleToString(take2, digits) + ","
+                 + "\"take3\":" + DoubleToString(take3, digits) + ","
+                 + "\"stopTicks\":" + IntegerToString(stopTicks)
+                 + "}";
+   
+   // Preparar cabeçalhos HTTP
+   string headers = "";
+   headers = headers + "Content-Type: application/json\r\n";
+   headers = headers + "User-Agent: MetaTrader5\r\n";
+   
+   // Preparar dados
+   char post[];
+   char result[];
+   string result_headers;
+   
+   // Converter JSON para array de bytes
+   int jsonLen = StringLen(json);
+   headers = headers + "Content-Length: " + IntegerToString(jsonLen) + "\r\n";
+   ArrayResize(post, jsonLen);
+   int copied = StringToCharArray(json, post, 0, jsonLen, CP_UTF8);
+   if(copied > 0 && copied <= jsonLen)
+   {
+      ArrayResize(post, copied);
+   }
+   
+   // Preparar array de resultado
+   ArrayResize(result, 0);
+   
+   // Realizar requisição HTTP PATCH
+   int timeout = 5000;
+   ResetLastError();
+   int res = WebRequest("PATCH", updateUrl, headers, timeout, post, result, result_headers);
+   
+   if(res == -1)
+   {
+      int error = GetLastError();
+      Print("❌ Erro WebRequest ao atualizar sinal: ", error);
+      Print("URL tentada: ", updateUrl);
+      return;
+   }
+   
+   string responseStr = CharArrayToString(result);
+   if(res >= 200 && res < 300)
+   {
+      Print("✅ Sinal atualizado com sucesso!");
+      Print("Resposta: ", responseStr);
+   }
+   else
+   {
+      Print("❌ Erro ao atualizar sinal. Código: ", res);
       Print("Resposta: ", responseStr);
    }
 }
