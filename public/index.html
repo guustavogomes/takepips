@@ -464,10 +464,64 @@
             height: 6px;
         }
 
-        /* Cards pendentes mantêm o estilo padrão */
-        .signal-card.status-pending {
+        /* Cards pendentes e em operação mantêm o estilo padrão */
+        .signal-card.status-pending,
+        .signal-card.status-em_operacao {
             background: var(--bg-card);
             border-color: var(--border-color);
+        }
+
+        /* Indicador de campo atualizado */
+        .price-row.updated {
+            animation: highlightUpdate 1.5s ease-out;
+        }
+
+        @keyframes highlightUpdate {
+            0% {
+                background-color: rgba(255, 193, 7, 0.4);
+                transform: scale(1.02);
+            }
+            50% {
+                background-color: rgba(255, 193, 7, 0.2);
+            }
+            100% {
+                background-color: transparent;
+                transform: scale(1);
+            }
+        }
+
+        .price-value.updated {
+            position: relative;
+            font-weight: 600;
+            color: var(--warning-color, #f59e0b);
+        }
+
+        .price-value.updated::after {
+            content: '🔄';
+            margin-left: 4px;
+            font-size: 0.85em;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .updated-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 4px;
+            animation: fadeInOut 3s ease-in-out;
+        }
+
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; }
+            10%, 90% { opacity: 1; }
         }
 
         /* Cards encerrados - fundo cinza/desativado */
@@ -785,6 +839,8 @@
         let isAutoRefreshOn = false;
         let currentTab = 'active'; // 'active' ou 'closed'
         let allSignals = []; // Armazenar todos os sinais carregados
+        let previousSignals = new Map(); // Rastrear estado anterior dos sinais para detectar mudanças
+        let recentlyUpdatedFields = new Map(); // Rastrear campos recentemente atualizados (id -> Set<field>)
 
         async function loadSignals() {
             const container = document.getElementById('signalsContainer');
@@ -815,9 +871,29 @@
                     throw new Error(data.error?.message || 'Erro ao carregar sinais');
                 }
 
-                allSignals = data.data || []; // Armazenar todos os sinais
+                const newSignals = data.data || [];
+                
+                allSignals = newSignals; // Armazenar todos os sinais
+                
+                // Detectar mudanças comparando com estado anterior (após atualizar allSignals)
+                detectChanges(newSignals);
                 updateStats(allSignals); // Atualizar estatísticas com todos os sinais
                 displaySignals(); // Exibir sinais filtrados pela aba ativa
+                
+                // Atualizar estado anterior
+                previousSignals.clear();
+                newSignals.forEach(signal => {
+                    previousSignals.set(signal.id, {
+                        entry: signal.entry,
+                        stopLoss: signal.stopLoss,
+                        take1: signal.take1,
+                        take2: signal.take2,
+                        take3: signal.take3,
+                        stopTicks: signal.stopTicks,
+                        status: signal.status,
+                        updatedAt: signal.updatedAt
+                    });
+                });
             } catch (error) {
                 if (!isAutoRefreshing) {
                     errorContainer.innerHTML = `
@@ -846,6 +922,7 @@
             
             if (currentTab === 'active') {
                 // Sinais em andamento: todos exceto ENCERRADO e TAKE3
+                // Inclui PENDING, EM_OPERACAO, STOP_LOSS, TAKE1, TAKE2
                 filteredSignals = allSignals.filter(signal => {
                     const status = (signal.status || 'PENDING').toUpperCase();
                     return status !== 'ENCERRADO' && status !== 'TAKE3';
@@ -892,6 +969,89 @@
             displaySignals();
         }
 
+        // Detectar mudanças nos sinais
+        function detectChanges(newSignals) {
+            newSignals.forEach(signal => {
+                const previous = previousSignals.get(signal.id);
+                if (!previous) {
+                    // Sinal novo, não há mudanças para detectar
+                    return;
+                }
+                
+                const updatedFields = new Set();
+                
+                // Comparar campos (com tolerância para diferenças de ponto flutuante)
+                const tolerance = 0.0001;
+                
+                if (Math.abs(signal.entry - previous.entry) > tolerance) {
+                    updatedFields.add('entry');
+                }
+                if (Math.abs(signal.stopLoss - previous.stopLoss) > tolerance) {
+                    updatedFields.add('stopLoss');
+                }
+                if (Math.abs(signal.take1 - previous.take1) > tolerance) {
+                    updatedFields.add('take1');
+                }
+                if (Math.abs(signal.take2 - previous.take2) > tolerance) {
+                    updatedFields.add('take2');
+                }
+                if (Math.abs(signal.take3 - previous.take3) > tolerance) {
+                    updatedFields.add('take3');
+                }
+                if (signal.stopTicks !== previous.stopTicks) {
+                    updatedFields.add('stopTicks');
+                }
+                if (signal.status !== previous.status) {
+                    updatedFields.add('status');
+                }
+                
+                // Se há campos atualizados, adicionar ao mapa de campos recentemente atualizados
+                if (updatedFields.size > 0) {
+                    recentlyUpdatedFields.set(signal.id, updatedFields);
+                    
+                    // Otimizar intervalo de refresh se auto-refresh estiver ativo
+                    optimizeRefreshInterval();
+                    
+                    // Remover após 5 segundos
+                    setTimeout(() => {
+                        recentlyUpdatedFields.delete(signal.id);
+                        // Forçar re-render do card específico para remover badges
+                        const card = document.querySelector(`[data-signal-id="${signal.id}"]`);
+                        if (card) {
+                            const index = allSignals.findIndex(s => s.id === signal.id);
+                            if (index !== -1) {
+                                const container = document.getElementById('signalsContainer');
+                                const filteredSignals = getFilteredSignals();
+                                const signalIndex = filteredSignals.findIndex(s => s.id === signal.id);
+                                if (signalIndex !== -1) {
+                                    // Substituir apenas o card específico
+                                    const cards = container.querySelectorAll('.signal-card');
+                                    if (cards[signalIndex]) {
+                                        cards[signalIndex].outerHTML = createSignalCard(allSignals[index]);
+                                    }
+                                }
+                            }
+                        }
+                    }, 5000);
+                }
+            });
+        }
+
+        // Obter sinais filtrados
+        function getFilteredSignals() {
+            if (currentTab === 'active') {
+                return allSignals.filter(signal => {
+                    const status = (signal.status || 'PENDING').toUpperCase();
+                    return status !== 'ENCERRADO' && status !== 'TAKE3';
+                });
+            } else {
+                return allSignals.filter(signal => {
+                    const status = (signal.status || 'PENDING').toUpperCase();
+                    return status === 'ENCERRADO' || status === 'TAKE3';
+                });
+            }
+        }
+
         function createSignalCard(signal) {
             const type = signal.type.toLowerCase();
             // Normalizar status para garantir que funcione com qualquer formato
@@ -903,6 +1063,9 @@
             // Adicionar classe de status para aplicar cores de fundo
             // Ex: 'stop_loss', 'take1', 'take2', 'take3', 'pending'
             const statusClass = `status-${status}`;
+            
+            // Verificar quais campos foram atualizados
+            const updatedFields = recentlyUpdatedFields.get(signal.id) || new Set();
             
             const formatPrice = (price) => {
                 if (typeof price !== 'number' || isNaN(price)) return '-';
@@ -923,9 +1086,27 @@
             };
 
             const hitInfo = getHitInfo(signal);
+            
+            // Função helper para criar uma linha de preço com indicador de atualização
+            const createPriceRow = (label, value, fieldName) => {
+                const isUpdated = updatedFields.has(fieldName);
+                const updatedClass = isUpdated ? 'updated' : '';
+                const updatedBadge = isUpdated ? '<span class="updated-badge">Atualizado</span>' : '';
+                const hitClass = 
+                    (fieldName === 'stopLoss' && signal.stopHitPrice) ||
+                    (fieldName === 'take1' && signal.take1HitPrice) ||
+                    (fieldName === 'take2' && signal.take2HitPrice) ||
+                    (fieldName === 'take3' && signal.take3HitPrice) ? 'hit' : '';
+                return `
+                    <div class="price-row ${updatedClass}">
+                        <span class="price-label">${label}:</span>
+                        <span class="price-value ${updatedClass} ${hitClass}">${formatPrice(value)}${updatedBadge}</span>
+                    </div>
+                `;
+            };
 
             return `
-                <div class="signal-card ${type} ${statusClass}">
+                <div class="signal-card ${type} ${statusClass}" data-signal-id="${signal.id}">
                     <div class="signal-header">
                         <span class="signal-type ${type}">${signal.type}</span>
                         <span class="signal-status ${status}">${statusText}</span>
@@ -934,26 +1115,11 @@
                     <div class="signal-symbol">${signal.symbol}</div>
                     
                     <div class="signal-prices">
-                        <div class="price-row">
-                            <span class="price-label">Entry:</span>
-                            <span class="price-value">${formatPrice(signal.entry)}</span>
-                        </div>
-                        <div class="price-row">
-                            <span class="price-label">Stop Loss:</span>
-                            <span class="price-value ${signal.stopHitPrice ? 'hit' : ''}">${formatPrice(signal.stopLoss)}</span>
-                        </div>
-                        <div class="price-row">
-                            <span class="price-label">Take 1:</span>
-                            <span class="price-value ${signal.take1HitPrice ? 'hit' : ''}">${formatPrice(signal.take1)}</span>
-                        </div>
-                        <div class="price-row">
-                            <span class="price-label">Take 2:</span>
-                            <span class="price-value ${signal.take2HitPrice ? 'hit' : ''}">${formatPrice(signal.take2)}</span>
-                        </div>
-                        <div class="price-row">
-                            <span class="price-label">Take 3:</span>
-                            <span class="price-value ${signal.take3HitPrice ? 'hit' : ''}">${formatPrice(signal.take3)}</span>
-                        </div>
+                        ${createPriceRow('Entry', signal.entry, 'entry')}
+                        ${createPriceRow('Stop Loss', signal.stopLoss, 'stopLoss')}
+                        ${createPriceRow('Take 1', signal.take1, 'take1')}
+                        ${createPriceRow('Take 2', signal.take2, 'take2')}
+                        ${createPriceRow('Take 3', signal.take3, 'take3')}
                     </div>
 
                     ${hitInfo ? `<div class="hit-info">${hitInfo}</div>` : ''}
@@ -971,6 +1137,8 @@
             const statusMap = {
                 'PENDING': 'Pendente',
                 'pending': 'Pendente',
+                'EM_OPERACAO': 'Em Operação',
+                'em_operacao': 'Em Operação',
                 'STOP_LOSS': 'Stop Loss',
                 'stop_loss': 'Stop Loss',
                 'STOPLOSS': 'Stop Loss',
@@ -1023,7 +1191,8 @@
             // Excluir sinais encerrados da contagem de pendentes
             const pending = signals.filter(s => {
                 const status = (s.status || 'PENDING').toUpperCase();
-                return status === 'PENDING' && status !== 'ENCERRADO';
+                // PENDING ou EM_OPERACAO contam como pendentes (em andamento)
+                return (status === 'PENDING' || status === 'EM_OPERACAO') && status !== 'ENCERRADO';
             }).length;
             
             const stopLoss = signals.filter(s => {
@@ -1141,6 +1310,25 @@
             }
         }
 
+        // Tornar atualização mais reativa - reduzir intervalo quando há mudanças
+        function optimizeRefreshInterval() {
+            if (isAutoRefreshOn && recentlyUpdatedFields.size > 0) {
+                // Se há atualizações recentes, verificar mais frequentemente
+                clearInterval(autoRefreshInterval);
+                const fastInterval = 5000; // 5 segundos
+                autoRefreshInterval = setInterval(loadSignals, fastInterval);
+                
+                // Voltar ao intervalo normal após 30 segundos sem atualizações
+                setTimeout(() => {
+                    if (recentlyUpdatedFields.size === 0 && isAutoRefreshOn) {
+                        clearInterval(autoRefreshInterval);
+                        const normalInterval = 15000; // 15 segundos
+                        autoRefreshInterval = setInterval(loadSignals, normalInterval);
+                    }
+                }, 30000);
+            }
+        }
+
         function autoRefresh() {
             const btn = document.getElementById('autoRefreshBtn');
             
@@ -1152,6 +1340,8 @@
                 // Intervalo otimizado: 15 segundos (reduz carga no servidor)
                 const refreshInterval = 15000;
                 autoRefreshInterval = setInterval(loadSignals, refreshInterval);
+                // Verificar mudanças para otimizar intervalo
+                optimizeRefreshInterval();
                 isAutoRefreshOn = true;
                 btn.innerHTML = `<span>⏱️ Auto-refresh: ON (${refreshInterval / 1000}s)</span>`;
             }

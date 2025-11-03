@@ -1466,6 +1466,8 @@ void MonitorPriceLevels()
          {
             BuyEntryHit = true;
             Print("✅ BUY Entry atingida! Preço: ", ask, " | Entry: ", buyEntry);
+            // Atualizar status para EM_OPERACAO e enviar notificação
+            UpdateSignalStatus(BuySignalId, "EM_OPERACAO", ask);
          }
       }
       
@@ -1553,6 +1555,8 @@ void MonitorPriceLevels()
          {
             SellEntryHit = true;
             Print("✅ SELL Entry atingida! Preço: ", bid, " | Entry: ", sellEntry);
+            // Atualizar status para EM_OPERACAO e enviar notificação
+            UpdateSignalStatus(SellSignalId, "EM_OPERACAO", bid);
          }
       }
       

@@ -210,6 +210,33 @@ export async function notifySignalUpdate(
 }
 
 /**
+ * Enviar notificação quando a entrada é atingida (sinal entra em operação)
+ */
+export async function notifyEntryHit(
+  signalType: 'BUY' | 'SELL',
+  symbol: string,
+  entryPrice: number
+): Promise<void> {
+  console.log('[PUSH] notifyEntryHit chamado:', { signalType, symbol, entryPrice });
+  
+  const emoji = signalType === 'BUY' ? '📈' : '📉';
+  const title = `🎯 ${emoji} Sinal ${signalType} em Operação - ${symbol}`;
+  const body = `Entrada atingida em ${entryPrice.toFixed(2)}`;
+
+  console.log('[PUSH] Preparando notificação de entrada:', { title, body });
+
+  await sendPushNotification(title, body, {
+    signalType,
+    symbol,
+    entryPrice,
+    event: 'ENTRY_HIT',
+    timestamp: new Date().toISOString(),
+  });
+
+  console.log('[PUSH] notifyEntryHit concluído');
+}
+
+/**
  * Enviar notificação quando os valores de um sinal são atualizados (entry, stops, takes)
  */
 export async function notifySignalDataUpdate(

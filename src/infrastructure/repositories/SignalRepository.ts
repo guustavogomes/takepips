@@ -93,7 +93,17 @@ export class SignalRepository implements ISignalRepository {
     let params: any[] = [];
     
     // Determinar qual campo atualizar baseado no status
-    if (status === 'STOP_LOSS') {
+    if (status === 'EM_OPERACAO') {
+      // Quando entrada é atingida, apenas atualiza o status (não precisa de campos específicos)
+      query = `
+        UPDATE signals 
+        SET status = $1, 
+            updated_at = $2
+        WHERE id = $3
+        RETURNING *
+      `;
+      params = [status, now.toISOString(), id];
+    } else if (status === 'STOP_LOSS') {
       query = `
         UPDATE signals 
         SET status = $1, 

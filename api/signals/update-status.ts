@@ -1,7 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { SignalRepository } from '../../src/infrastructure/repositories/SignalRepository';
 import { SignalStatus } from '../../src/domain/entities/Signal';
-import { notifySignalUpdate } from '../../src/shared/utils/pushNotifications';
+import { notifySignalUpdate, notifyEntryHit } from '../../src/shared/utils/pushNotifications';
 
 /**
  * API Route para atualizar status de sinal
@@ -79,19 +79,10 @@ export default async function handler(
       return;
     }
 
-    if (typeof hitPrice !== 'number' || hitPrice <= 0) {
-      res.status(400).json({
-        success: false,
-        error: {
-          message: 'Campo "hitPrice" é obrigatório e deve ser um número positivo',
-          code: 'INVALID_HIT_PRICE',
-        },
-      });
-      return;
-    }
+    // hitPrice é opcional para EM_OPERACAO, mas obrigatório para outros status
 
     // Validar status
-    const validStatuses: SignalStatus[] = ['STOP_LOSS', 'TAKE1', 'TAKE2', 'TAKE3'];
+    const validStatuses: SignalStatus[] = ['EM_OPERACAO', 'STOP_LOSS', 'TAKE1', 'TAKE2', 'TAKE3'];
     if (!validStatuses.includes(status)) {
       res.status(400).json({
         success: false,
@@ -102,17 +93,40 @@ export default async function handler(
       });
       return;
     }
+    
+    // Para EM_OPERACAO, hitPrice é opcional (pode ser 0 ou o preço de entrada)
+    if (status !== 'EM_OPERACAO' && (typeof hitPrice !== 'number' || hitPrice <= 0)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: 'Campo "hitPrice" é obrigatório e deve ser um número positivo para este status',
+          code: 'INVALID_HIT_PRICE',
+        },
+      });
+      return;
+    }
 
     // Atualizar status no banco
     const signalRepository = new SignalRepository();
-    const updatedSignal = await signalRepository.updateStatus(id, status, hitPrice);
+    // Para EM_OPERACAO, usar hitPrice se fornecido, senão usar 0 (não será usado no repositório)
+    const finalHitPrice = status === 'EM_OPERACAO' ? (hitPrice || 0) : hitPrice;
+    const updatedSignal = await signalRepository.updateStatus(id, status, finalHitPrice);
 
     // Enviar notificação push (não bloqueia a resposta)
-    // Se for TAKE3, o status no banco será ENCERRADO, mas a notificação ainda mostra TAKE3
-    notifySignalUpdate(updatedSignal.type, updatedSignal.symbol, status, hitPrice)
-      .catch(error => {
-        console.error('[PUSH] Erro ao enviar notificação (não crítico):', error);
-      });
+    // Se for EM_OPERACAO, usar função específica para entrada atingida
+    if (status === 'EM_OPERACAO') {
+      const entryPrice = hitPrice || updatedSignal.entry;
+      notifyEntryHit(updatedSignal.type, updatedSignal.symbol, entryPrice)
+        .catch(error => {
+          console.error('[PUSH] Erro ao enviar notificação de entrada (não crítico):', error);
+        });
+    } else {
+      // Se for TAKE3, o status no banco será ENCERRADO, mas a notificação ainda mostra TAKE3
+      notifySignalUpdate(updatedSignal.type, updatedSignal.symbol, status, hitPrice)
+        .catch(error => {
+          console.error('[PUSH] Erro ao enviar notificação (não crítico):', error);
+        });
+    }
 
     // Log quando Take 3 encerra automaticamente
     if (status === 'TAKE3') {

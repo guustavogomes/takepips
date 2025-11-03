@@ -95,6 +95,28 @@ export default async function handler(
       return;
     }
 
+    // Detectar quais campos foram realmente alterados
+    const changedFields: string[] = [];
+    
+    if (entry !== undefined && Math.abs(entry - signalBefore.entry) > 0.0001) {
+      changedFields.push('entry');
+    }
+    if (stopLoss !== undefined && Math.abs(stopLoss - signalBefore.stopLoss) > 0.0001) {
+      changedFields.push('stopLoss');
+    }
+    if (take1 !== undefined && Math.abs(take1 - signalBefore.take1) > 0.0001) {
+      changedFields.push('take1');
+    }
+    if (take2 !== undefined && Math.abs(take2 - signalBefore.take2) > 0.0001) {
+      changedFields.push('take2');
+    }
+    if (take3 !== undefined && Math.abs(take3 - signalBefore.take3) > 0.0001) {
+      changedFields.push('take3');
+    }
+    if (stopTicks !== undefined && stopTicks !== signalBefore.stopTicks) {
+      changedFields.push('stopTicks');
+    }
+
     const updatedSignal = await signalRepository.update(id, {
       entry,
       stopLoss,
@@ -137,6 +159,7 @@ export default async function handler(
         take3: updatedSignal.take3,
         stopTicks: updatedSignal.stopTicks,
         updatedAt: updatedSignal.updatedAt.toISOString(),
+        changedFields: changedFields, // Campos que foram realmente alterados
       },
     });
   } catch (error) {
