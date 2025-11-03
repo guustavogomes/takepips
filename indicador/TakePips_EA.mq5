@@ -56,6 +56,8 @@ bool LinesInitialized = false;
 bool BuySignalSent = false; // Controla se já enviou sinal BUY
 bool SellSignalSent = false; // Controla se já enviou sinal SELL
 datetime lastSignalTime = 0;
+datetime initializationTime = 0; // Timestamp da inicialização - usado para bloquear envio imediato
+int initializationDelaySeconds = 5; // Delay mínimo em segundos após inicialização antes de permitir envio automático
 
 //--- Variáveis para rastreamento de IDs e status
 string BuySignalId = ""; // ID do sinal BUY retornado pela API
@@ -136,23 +138,45 @@ int OnInit()
    
    EAEnabled = true;
    
-   // Limpar qualquer mensagem anterior no gráfico
-   Comment("");
+   // ========== LIMPEZA COMPLETA DE ESTADOS ==========
+   // LIMPAR TUDO: Resetar completamente todos os estados para evitar usar histórico antigo
+   Print("🧹 Limpando TODOS os estados do Expert Advisor...");
    
-   // IMPORTANTE: Garantir que não envie sinais automaticamente se AutoSendSignals estiver desativado
-   // Resetar flags de sinal enviado para garantir que só envie se AutoSendSignals estiver ativo
+   // Limpar IDs de sinais (CRÍTICO para evitar monitoramento de sinais antigos)
+   BuySignalId = "";
+   SellSignalId = "";
+   
+   // Limpar flags de envio de sinais
    BuySignalSent = !AutoSendSignals; // Se AutoSendSignals = false, marcar como já enviado (bloquear)
    SellSignalSent = !AutoSendSignals; // Se AutoSendSignals = false, marcar como já enviado (bloquear)
    
-   // CRÍTICO: Garantir que não há IDs de sinais "fantasma" de execuções anteriores
-   // Se não há sinal enviado, garantir que os IDs estão vazios e flags resetadas
-   BuySignalId = ""; // Limpar qualquer ID residual
-   SellSignalId = ""; // Limpar qualquer ID residual
-   BuyEntryHit = false; // Resetar flag de entrada atingida
-   SellEntryHit = false; // Resetar flag de entrada atingida
+   // Limpar TODAS as flags de monitoramento BUY
+   BuyEntryHit = false;
+   BuyStopHit = false;
+   BuyTake1Hit = false;
+   BuyTake2Hit = false;
+   BuyTake3Hit = false;
    
+   // Limpar TODAS as flags de monitoramento SELL
+   SellEntryHit = false;
+   SellStopHit = false;
+   SellTake1Hit = false;
+   SellTake2Hit = false;
+   SellTake3Hit = false;
+   
+   // Resetar timestamp do último sinal
+   lastSignalTime = 0;
+   
+   // Limpar qualquer mensagem anterior no gráfico
+   Comment("");
+   
+   Print("✅ Todos os estados foram limpos!");
    Print("🔒 AutoSendSignals: ", AutoSendSignals, " | Sinais automáticos: ", AutoSendSignals ? "ATIVADO" : "DESATIVADO");
-   Print("🧹 IDs de sinais resetados para garantir monitoramento apenas após envio manual.");
+   Print("📌 IMPORTANTE: O EA começará SEM histórico. Envie sinais manualmente usando o botão 'Enviar Sinal'.");
+   
+   // Registrar tempo de inicialização para bloquear envio imediato
+   initializationTime = TimeCurrent();
+   Print("⏱️ Bloqueio de ", initializationDelaySeconds, " segundos ativado após inicialização para evitar envio automático imediato.");
    
    // Criar linhas se não existirem
    CreateLinesIfNeeded();
@@ -325,12 +349,59 @@ void OnTick()
    if(!LinesInitialized)
       return;
    
+   // ========== LÓGICA DE ENVIO AUTOMÁTICO ==========
+   // CRÍTICO: O envio automático SÓ funciona se já existe um sinal enviado manualmente
+   // Isso significa que AutoSendSignals só funciona para ENVIAR NOVOS SINAIS
+   // quando já existe pelo menos um sinal sendo monitorado (BuySignalId ou SellSignalId)
+   // 
+   // REGRA: 
+   // - Primeiro sinal DEVE ser enviado manualmente via botão
+   // - Depois disso, AutoSendSignals pode enviar novos sinais automaticamente
+   // - Não faz sentido "atualizar" um sinal que nunca foi enviado!
+   
+   bool hasActiveSignals = (BuySignalId != "" || SellSignalId != "");
+   
+   // Se não há sinais ativos e AutoSendSignals está ativo, bloquear envio automático
+   // Primeiro sinal SEMPRE deve ser manual
+   if(!hasActiveSignals && AutoSendSignals)
+   {
+      static bool firstAutoBlockWarning = true;
+      if(firstAutoBlockWarning)
+      {
+         Print("🔒 Envio automático bloqueado: Nenhum sinal foi enviado manualmente ainda.");
+         Print("📌 Primeiro envie um sinal manualmente usando o botão 'Enviar Sinal', depois o envio automático será habilitado.");
+         firstAutoBlockWarning = false;
+      }
+      return; // Bloquear envio automático até que haja um sinal manual
+   }
+   
+   // Se AutoSendSignals está desativado, não processar envio automático
+   if(!AutoSendSignals)
+      return;
+   
+   // CRÍTICO: Bloquear envio automático nos primeiros segundos após inicialização
+   // Isso evita que sinais sejam enviados imediatamente quando linhas são criadas no preço atual
+   // NOTA: currentTime já foi declarado no início da função, apenas reutilizar
+   if(initializationTime > 0 && (currentTime - initializationTime) < initializationDelaySeconds)
+   {
+      // Ainda está no período de bloqueio - não enviar sinais automaticamente
+      static bool firstBlockWarning = true;
+      if(firstBlockWarning)
+      {
+         Print("⏸️ Envio automático bloqueado por mais ", initializationDelaySeconds - (int)(currentTime - initializationTime), " segundos após inicialização.");
+         firstBlockWarning = false;
+      }
+      return; // SAIR sem processar envio automático
+   }
+   
    // Obter preços atuais
    double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    
    // Verificar se preço atingiu linha de entrada BUY
-   if(!BuySignalSent)
+   // IMPORTANTE: Só enviar BUY automaticamente se já existe um sinal SELL sendo monitorado
+   // Ou se já existe um BUY sendo monitorado (para re-envio após reset)
+   if(!BuySignalSent && (SellSignalId != "" || BuySignalId != ""))
    {
       double buyEntry = ObjectGetDouble(0, BuyEntryLine, OBJPROP_PRICE);
       if(buyEntry > 0)
@@ -345,7 +416,9 @@ void OnTick()
    }
    
    // Verificar se preço atingiu linha de entrada SELL
-   if(!SellSignalSent)
+   // IMPORTANTE: Só enviar SELL automaticamente se já existe um sinal BUY sendo monitorado
+   // Ou se já existe um SELL sendo monitorado (para re-envio após reset)
+   if(!SellSignalSent && (BuySignalId != "" || SellSignalId != ""))
    {
       double sellEntry = ObjectGetDouble(0, SellEntryLine, OBJPROP_PRICE);
       if(sellEntry > 0)
@@ -824,6 +897,17 @@ void OnResetButtonClick()
       return;
    }
    
+   // ========== LIMPAR LOG DO EXPERT ==========
+   // Imprimir múltiplas linhas em branco para separar visualmente o log
+   // Isso ajuda a limpar a confusão de logs antigos
+   Print("");
+   Print("═══════════════════════════════════════════════════════════════");
+   Print("🔄 RESET EXECUTADO - LOG LIMPO");
+   Print("═══════════════════════════════════════════════════════════════");
+   Print("");
+   Print("");
+   Print("");
+   
    Print("🔄 Resetando monitoramento de sinais...");
    
    // Encerrar sinal BUY se existir
@@ -853,6 +937,17 @@ void OnResetButtonClick()
       SellSignalSent = false;
       Print("✅ Sinal SELL resetado");
    }
+   
+   // Limpar mensagem do gráfico
+   Comment("");
+   
+   Print("═══════════════════════════════════════════════════════════════");
+   Print("✅ Reset concluído! Todos os estados foram limpos.");
+   Print("📌 Pronto para enviar novos sinais manualmente.");
+   Print("═══════════════════════════════════════════════════════════════");
+   Print("");
+   Print("");
+   Print("");
    
    Alert("✅ Monitoramento resetado!\n\nOs sinais foram encerrados e você pode enviar novos sinais.");
 }
