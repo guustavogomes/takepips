@@ -60,8 +60,8 @@ datetime lastSignalTime = 0;
 //--- Variáveis para rastreamento de IDs e status
 string BuySignalId = ""; // ID do sinal BUY retornado pela API
 string SellSignalId = ""; // ID do sinal SELL retornado pela API
-bool BuyEntryHit = false; // Se entrada BUY foi atingida (necessário para monitorar stop)
-bool SellEntryHit = false; // Se entrada SELL foi atingida (necessário para monitorar stop)
+bool BuyEntryHit = false; // Se entrada BUY foi atingida (ativa EM_OPERACAO apenas UMA VEZ por sinal)
+bool SellEntryHit = false; // Se entrada SELL foi atingida (ativa EM_OPERACAO apenas UMA VEZ por sinal)
 bool BuyStopHit = false; // Se stop loss BUY foi atingido
 bool BuyTake1Hit = false; // Se take 1 BUY foi atingido
 bool BuyTake2Hit = false; // Se take 2 BUY foi atingido
@@ -138,6 +138,21 @@ int OnInit()
    
    // Limpar qualquer mensagem anterior no gráfico
    Comment("");
+   
+   // IMPORTANTE: Garantir que não envie sinais automaticamente se AutoSendSignals estiver desativado
+   // Resetar flags de sinal enviado para garantir que só envie se AutoSendSignals estiver ativo
+   BuySignalSent = !AutoSendSignals; // Se AutoSendSignals = false, marcar como já enviado (bloquear)
+   SellSignalSent = !AutoSendSignals; // Se AutoSendSignals = false, marcar como já enviado (bloquear)
+   
+   // CRÍTICO: Garantir que não há IDs de sinais "fantasma" de execuções anteriores
+   // Se não há sinal enviado, garantir que os IDs estão vazios e flags resetadas
+   BuySignalId = ""; // Limpar qualquer ID residual
+   SellSignalId = ""; // Limpar qualquer ID residual
+   BuyEntryHit = false; // Resetar flag de entrada atingida
+   SellEntryHit = false; // Resetar flag de entrada atingida
+   
+   Print("🔒 AutoSendSignals: ", AutoSendSignals, " | Sinais automáticos: ", AutoSendSignals ? "ATIVADO" : "DESATIVADO");
+   Print("🧹 IDs de sinais resetados para garantir monitoramento apenas após envio manual.");
    
    // Criar linhas se não existirem
    CreateLinesIfNeeded();
@@ -295,7 +310,19 @@ void OnTick()
       MonitorPriceLevels();
    }
    
-   if(!AutoSendSignals || !LinesInitialized)
+   // BLOQUEIO CRÍTICO: Não enviar sinais automaticamente se AutoSendSignals estiver desativado
+   if(!AutoSendSignals)
+   {
+      // Se AutoSendSignals está desativado, garantir que as flags estejam bloqueadas
+      if(!BuySignalSent)
+         BuySignalSent = true; // Bloquear envio automático BUY
+      if(!SellSignalSent)
+         SellSignalSent = true; // Bloquear envio automático SELL
+      return; // SAIR imediatamente - não processar envio automático
+   }
+   
+   // Se AutoSendSignals está ativo mas linhas não estão inicializadas, sair
+   if(!LinesInitialized)
       return;
    
    // Obter preços atuais
@@ -944,7 +971,7 @@ void OnSendButtonClick()
       buyStopTicks = 1;
    
    // Resetar flags de monitoramento BUY ao enviar novo sinal
-   BuyEntryHit = false;
+   BuyEntryHit = false; // CRÍTICO: Resetar para permitir monitoramento de entrada após envio
    BuyStopHit = false;
    BuyTake1Hit = false;
    BuyTake2Hit = false;
@@ -953,7 +980,15 @@ void OnSendButtonClick()
    string buyId = SendSignal("BUY", buyEntry, buyStopLoss, buyTake1, buyTake2, buyTake3, buyStopTicks);
    bool buySuccess = (buyId != "");
    if(buySuccess)
-      BuySignalId = buyId;
+   {
+      BuySignalId = buyId; // Definir ID do sinal enviado - AGORA pode monitorar EM_OPERACAO
+      Print("✅ Sinal BUY enviado! ID: ", buyId, " | Agora monitorando entrada para EM_OPERACAO...");
+   }
+   else
+   {
+      BuySignalId = ""; // Garantir que está vazio se falhou
+      Print("❌ Falha ao enviar sinal BUY. Monitoramento não será ativado.");
+   }
    
    // ========== ENVIAR SINAL SELL ==========
    double sellEntry = ObjectGetDouble(0, SellEntryLine, OBJPROP_PRICE);
@@ -969,7 +1004,7 @@ void OnSendButtonClick()
       sellStopTicks = 1;
    
    // Resetar flags de monitoramento SELL ao enviar novo sinal
-   SellEntryHit = false;
+   SellEntryHit = false; // CRÍTICO: Resetar para permitir monitoramento de entrada após envio
    SellStopHit = false;
    SellTake1Hit = false;
    SellTake2Hit = false;
@@ -978,7 +1013,15 @@ void OnSendButtonClick()
    string sellId = SendSignal("SELL", sellEntry, sellStopLoss, sellTake1, sellTake2, sellTake3, sellStopTicks);
    bool sellSuccess = (sellId != "");
    if(sellSuccess)
-      SellSignalId = sellId;
+   {
+      SellSignalId = sellId; // Definir ID do sinal enviado - AGORA pode monitorar EM_OPERACAO
+      Print("✅ Sinal SELL enviado! ID: ", sellId, " | Agora monitorando entrada para EM_OPERACAO...");
+   }
+   else
+   {
+      SellSignalId = ""; // Garantir que está vazio se falhou
+      Print("❌ Falha ao enviar sinal SELL. Monitoramento não será ativado.");
+   }
    
    // ========== RESULTADO ==========
    // Limpar mensagem de erro do gráfico se houver
@@ -1459,15 +1502,25 @@ void MonitorPriceLevels()
       double buyTake3 = ObjectGetDouble(0, BuyTake3Line, OBJPROP_PRICE);
       
       // PRIMEIRO: Verificar se ENTRADA BUY foi atingida
-      if(!BuyEntryHit && buyEntry > 0)
+      // IMPORTANTE: Esta verificação só acontece UMA VEZ por sinal enviado
+      // Uma vez que BuyEntryHit = true, nunca mais verifica a entrada BUY novamente
+      // Mesmo que o preço volte a tocar a entrada, não atualiza mais o status
+      // Para monitorar novamente, é necessário enviar um novo sinal
+      // CRÍTICO: Só monitora se existe um sinal válido enviado (BuySignalId não vazio)
+      if(BuySignalId != "" && !BuyEntryHit && buyEntry > 0)
       {
          // Entrada BUY é ativada quando ASK (preço de compra) atinge ou ultrapassa a linha
          if(ask >= buyEntry - PriceTolerance)
          {
-            BuyEntryHit = true;
+            BuyEntryHit = true; // Marcar como atingido - NUNCA mais será verificado novamente neste sinal
             Print("✅ BUY Entry atingida! Preço: ", ask, " | Entry: ", buyEntry);
-            // Atualizar status para EM_OPERACAO e enviar notificação
-            UpdateSignalStatus(BuySignalId, "EM_OPERACAO", ask);
+            Print("📌 EM_OPERACAO ativado para BUY. Entrada não será mais monitorada neste sinal.");
+            // Atualizar status para EM_OPERACAO e enviar notificação (apenas uma vez)
+            // VERIFICAÇÃO FINAL: Garantir que BuySignalId ainda é válido antes de atualizar
+            if(BuySignalId != "")
+               UpdateSignalStatus(BuySignalId, "EM_OPERACAO", ask);
+            else
+               Print("⚠️ AVISO: BuySignalId estava vazio ao tentar atualizar EM_OPERACAO!");
          }
       }
       
@@ -1548,15 +1601,25 @@ void MonitorPriceLevels()
       double sellTake3 = ObjectGetDouble(0, SellTake3Line, OBJPROP_PRICE);
       
       // PRIMEIRO: Verificar se ENTRADA SELL foi atingida
-      if(!SellEntryHit && sellEntry > 0)
+      // IMPORTANTE: Esta verificação só acontece UMA VEZ por sinal enviado
+      // Uma vez que SellEntryHit = true, nunca mais verifica a entrada SELL novamente
+      // Mesmo que o preço volte a tocar a entrada, não atualiza mais o status
+      // Para monitorar novamente, é necessário enviar um novo sinal
+      // CRÍTICO: Só monitora se existe um sinal válido enviado (SellSignalId não vazio)
+      if(SellSignalId != "" && !SellEntryHit && sellEntry > 0)
       {
          // Entrada SELL é ativada quando BID (preço de venda) atinge ou ultrapassa a linha
          if(bid <= sellEntry + PriceTolerance)
          {
-            SellEntryHit = true;
+            SellEntryHit = true; // Marcar como atingido - NUNCA mais será verificado novamente neste sinal
             Print("✅ SELL Entry atingida! Preço: ", bid, " | Entry: ", sellEntry);
-            // Atualizar status para EM_OPERACAO e enviar notificação
-            UpdateSignalStatus(SellSignalId, "EM_OPERACAO", bid);
+            Print("📌 EM_OPERACAO ativado para SELL. Entrada não será mais monitorada neste sinal.");
+            // Atualizar status para EM_OPERACAO e enviar notificação (apenas uma vez)
+            // VERIFICAÇÃO FINAL: Garantir que SellSignalId ainda é válido antes de atualizar
+            if(SellSignalId != "")
+               UpdateSignalStatus(SellSignalId, "EM_OPERACAO", bid);
+            else
+               Print("⚠️ AVISO: SellSignalId estava vazio ao tentar atualizar EM_OPERACAO!");
          }
       }
       

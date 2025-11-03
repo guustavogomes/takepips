@@ -1223,68 +1223,91 @@
                 if (signal.take3HitPrice) totalTakesHit++;
             });
 
+            // Função para calcular pontos baseado no símbolo/ativo
+            function calculatePoints(symbol, priceDiff) {
+                if (!symbol) symbol = '';
+                const symbolUpper = symbol.toUpperCase();
+                
+                // Configuração de multiplicador por ativo
+                // Ajuste estes valores conforme necessário para cada ativo
+                const symbolMultipliers = {
+                    // Exemplos (ajuste conforme seu ativo):
+                    // 'WINFUT': 1,      // WINFUT - usar diferença direta
+                    // 'WIN': 10,        // WIN - dividir por 10
+                    // 'IND': 100,       // IND - dividir por 100
+                    // Adicione mais símbolos conforme necessário
+                };
+                
+                // Se não houver configuração específica, usar 1 (diferença direta)
+                // Para o novo ativo, vamos usar a diferença direta sem divisão
+                const multiplier = symbolMultipliers[symbolUpper] || 1;
+                
+                // Calcular pontos: diferença de preço / multiplicador
+                return parseFloat((priceDiff / multiplier).toFixed(3));
+            }
+            
             // Calcular pontos apenas dos últimos 30 dias
             signalsLast30Days.forEach(signal => {
-                // Trabalhar com a precisão original do banco (3 casas decimais)
-                // Normalizar para 3 casas decimais antes de calcular para evitar erros de ponto flutuante
-                const entry = parseFloat(parseFloat(signal.entry || 0).toFixed(3));
+                // Trabalhar com a precisão original do banco (5 casas decimais para precisão)
+                const entry = parseFloat(parseFloat(signal.entry || 0).toFixed(5));
                 const type = signal.type.toUpperCase();
+                const symbol = signal.symbol || '';
                 
                 // Calcular pontos do Take 1 (se atingido)
                 if (signal.take1HitPrice) {
-                    const take1Price = parseFloat(parseFloat(signal.take1HitPrice).toFixed(3));
+                    const take1Price = parseFloat(parseFloat(signal.take1HitPrice).toFixed(5));
                     let priceDiff = 0;
                     if (type === 'BUY') {
                         priceDiff = take1Price - entry;
                     } else {
                         priceDiff = entry - take1Price;
                     }
-                    // Normalizar diferença para 3 casas decimais
-                    priceDiff = parseFloat(priceDiff.toFixed(3));
-                    // Dividir por 10 e normalizar para 3 casas antes de somar
-                    const points = parseFloat((priceDiff / 10).toFixed(3));
+                    // Normalizar diferença para 5 casas decimais
+                    priceDiff = parseFloat(priceDiff.toFixed(5));
+                    // Calcular pontos usando função específica por ativo
+                    const points = calculatePoints(symbol, priceDiff);
                     totalPoints += points;
                 }
                 
                 // Calcular pontos do Take 2 (se atingido)
                 if (signal.take2HitPrice) {
-                    const take2Price = parseFloat(parseFloat(signal.take2HitPrice).toFixed(3));
+                    const take2Price = parseFloat(parseFloat(signal.take2HitPrice).toFixed(5));
                     let priceDiff = 0;
                     if (type === 'BUY') {
                         priceDiff = take2Price - entry;
                     } else {
                         priceDiff = entry - take2Price;
                     }
-                    priceDiff = parseFloat(priceDiff.toFixed(3));
-                    const points = parseFloat((priceDiff / 10).toFixed(3));
+                    priceDiff = parseFloat(priceDiff.toFixed(5));
+                    const points = calculatePoints(symbol, priceDiff);
                     totalPoints += points;
                 }
                 
                 // Calcular pontos do Take 3 (se atingido)
                 if (signal.take3HitPrice) {
-                    const take3Price = parseFloat(parseFloat(signal.take3HitPrice).toFixed(3));
+                    const take3Price = parseFloat(parseFloat(signal.take3HitPrice).toFixed(5));
                     let priceDiff = 0;
                     if (type === 'BUY') {
                         priceDiff = take3Price - entry;
                     } else {
                         priceDiff = entry - take3Price;
                     }
-                    priceDiff = parseFloat(priceDiff.toFixed(3));
-                    const points = parseFloat((priceDiff / 10).toFixed(3));
+                    priceDiff = parseFloat(priceDiff.toFixed(5));
+                    const points = calculatePoints(symbol, priceDiff);
                     totalPoints += points;
                 }
                 
                 // Subtrair pontos se stop loss foi atingido
                 if (signal.stopHitPrice) {
-                    const stopPrice = parseFloat(parseFloat(signal.stopHitPrice).toFixed(3));
+                    const stopPrice = parseFloat(parseFloat(signal.stopHitPrice).toFixed(5));
                     let priceDiff = 0;
                     if (type === 'BUY') {
                         priceDiff = entry - stopPrice;
                     } else {
                         priceDiff = stopPrice - entry;
                     }
-                    priceDiff = parseFloat(priceDiff.toFixed(3));
-                    const points = parseFloat((priceDiff / 10).toFixed(3));
+                    priceDiff = parseFloat(priceDiff.toFixed(5));
+                    const points = calculatePoints(symbol, priceDiff);
                     totalPoints -= points;
                 }
             });
