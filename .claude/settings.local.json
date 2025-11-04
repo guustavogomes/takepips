@@ -8,7 +8,15 @@
       "Bash(npm uninstall:*)",
       "Bash(awk:*)",
       "Bash(ls:*)",
-      "Bash(node scripts/generate-mobile-assets.js:*)"
+      "Bash(node scripts/generate-mobile-assets.js:*)",
+      "Bash(eas build:*)",
+      "WebFetch(domain:expo.dev)",
+      "Bash(eas build:view:*)",
+      "Bash(eas build:list:*)",
+      "Bash(npx expo install --fix)",
+      "Bash(cat:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

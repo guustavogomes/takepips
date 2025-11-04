@@ -52,6 +52,9 @@ export default {
       apiUrl: process.env.API_URL || 'https://takepips.vercel.app',
       supabaseUrl: process.env.SUPABASE_URL || 'https://katfvkeirfdboahvogtv.supabase.co',
       supabaseAnonKey: process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthdGZ2a2VpcmZkYm9haHZvZ3R2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyMTMyMzgsImV4cCI6MjA3Nzc4OTIzOH0.D2EVE9npBhxr5aKqEZ-eb_doEpZIMwjzp5HsZ3a_71Y',
+      eas: {
+        projectId: 'af3feed4-e3ba-4731-bc6d-50d2bf5dece2',
+      },
     },
   },
 };

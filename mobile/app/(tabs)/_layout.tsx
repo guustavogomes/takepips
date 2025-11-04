@@ -7,10 +7,18 @@
 import { Tabs } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LoadingChart } from '@/presentation/components/LoadingChart';
+import { useNavigationLoading } from '@/presentation/hooks/useNavigationLoading';
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  const isLoading = useNavigationLoading();
+
   return (
-    <Tabs
+    <>
+      {isLoading && <LoadingChart />}
+      <Tabs
       screenOptions={{
         headerStyle: {
           backgroundColor: '#0A0E27',
@@ -26,8 +34,8 @@ export default function TabsLayout() {
           backgroundColor: '#0f1419',
           borderTopWidth: 1,
           borderTopColor: '#1a1f2e',
-          height: Platform.OS === 'ios' ? 88 : 65,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+          height: Platform.OS === 'ios' ? 88 : 65 + insets.bottom,
+          paddingBottom: Platform.OS === 'ios' ? 28 : Math.max(insets.bottom, 8),
           paddingTop: 8,
           elevation: 20,
           shadowColor: '#FFD700',
@@ -141,5 +149,6 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    </>
   );
 }

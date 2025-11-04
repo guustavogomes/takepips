@@ -1,0 +1,24 @@
+# Ignorar node_modules e cache
+node_modules/
+.expo/
+.expo-shared/
+dist/
+build/
+
+# Ignorar arquivos de configuração local
+.env.local
+.env.*.local
+
+# Ignorar logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignorar arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Ignorar arquivos da raiz do monorepo
+../package.json
+../pnpm-lock.yaml
+../.npmrc
