@@ -16,7 +16,9 @@
       "Bash(npx expo install --fix)",
       "Bash(cat:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(dir /b /s src*.html 2)",
+      "Bash(nul)"
     ],
     "deny": [],
     "ask": []

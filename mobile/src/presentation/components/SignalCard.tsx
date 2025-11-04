@@ -64,8 +64,42 @@ export const SignalCard: React.FC<SignalCardProps> = ({ signal, onPress }) => {
   const statusColor = getStatusColor(signal.status);
   const formattedTime = format(signal.time, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
 
+  // Verificar se algum take foi atingido
+  const hasTakeHit = signal.take1HitPrice || signal.take2HitPrice || signal.take3HitPrice;
+  const hasStopHit = signal.stopHitPrice;
+
+  // Determinar cor de fundo do card baseado nos hits
+  const getCardBackgroundColor = (): string => {
+    // Prioridade: Stop Loss tem prioridade sobre takes
+    if (hasStopHit) {
+      return '#2A1A1A'; // Fundo vermelho escuro
+    }
+    if (hasTakeHit) {
+      return '#1A2A1A'; // Fundo verde escuro
+    }
+    return '#1A1F3A'; // Fundo padrão
+  };
+
+  // Determinar cor da borda do card
+  const getCardBorderColor = (): string => {
+    // Prioridade: Stop Loss tem prioridade sobre takes
+    if (hasStopHit) {
+      return '#E74C3C'; // Borda vermelha
+    }
+    if (hasTakeHit) {
+      return '#2ECC71'; // Borda verde
+    }
+    return '#2A2F4A'; // Borda padrão
+  };
+
   const CardContent = (
-    <View style={styles.container}>
+    <View style={[
+      styles.container,
+      {
+        backgroundColor: getCardBackgroundColor(),
+        borderColor: getCardBorderColor()
+      }
+    ]}>
       <View style={styles.header}>
         <View style={styles.symbolContainer}>
           <Text style={styles.emoji}>{getSignalTypeEmoji(signal.type)}</Text>
@@ -85,7 +119,11 @@ export const SignalCard: React.FC<SignalCardProps> = ({ signal, onPress }) => {
             <Text style={styles.label}>Entry</Text>
             <Text style={styles.value}>{signal.entry.toFixed(2)}</Text>
           </View>
-          <View style={styles.valueContainer}>
+          <View style={[
+            styles.valueContainer,
+            signal.stopHitPrice && styles.hitBadge,
+            signal.stopHitPrice && { borderColor: '#E74C3C' }
+          ]}>
             <Text style={styles.label}>Stop Loss</Text>
             <Text style={[styles.value, { color: '#E74C3C' }]}>
               {signal.stopLoss.toFixed(2)}
@@ -94,19 +132,31 @@ export const SignalCard: React.FC<SignalCardProps> = ({ signal, onPress }) => {
         </View>
 
         <View style={styles.row}>
-          <View style={styles.valueContainer}>
+          <View style={[
+            styles.valueContainer,
+            signal.take1HitPrice && styles.hitBadge,
+            signal.take1HitPrice && { borderColor: '#2ECC71' }
+          ]}>
             <Text style={styles.label}>Take 1</Text>
             <Text style={[styles.value, { color: '#2ECC71' }]}>
               {signal.take1.toFixed(2)}
             </Text>
           </View>
-          <View style={styles.valueContainer}>
+          <View style={[
+            styles.valueContainer,
+            signal.take2HitPrice && styles.hitBadge,
+            signal.take2HitPrice && { borderColor: '#2ECC71' }
+          ]}>
             <Text style={styles.label}>Take 2</Text>
             <Text style={[styles.value, { color: '#2ECC71' }]}>
               {signal.take2.toFixed(2)}
             </Text>
           </View>
-          <View style={styles.valueContainer}>
+          <View style={[
+            styles.valueContainer,
+            signal.take3HitPrice && styles.hitBadge,
+            signal.take3HitPrice && { borderColor: '#2ECC71' }
+          ]}>
             <Text style={styles.label}>Take 3</Text>
             <Text style={[styles.value, { color: '#2ECC71' }]}>
               {signal.take3.toFixed(2)}
@@ -197,6 +247,12 @@ const styles = StyleSheet.create({
   },
   valueContainer: {
     flex: 1,
+  },
+  hitBadge: {
+    borderWidth: 2,
+    borderRadius: 8,
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   label: {
     fontSize: 12,

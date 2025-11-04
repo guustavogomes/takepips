@@ -1690,16 +1690,18 @@ void MonitorPriceLevels()
       // CRÍTICO: Só monitora se existe um sinal válido enviado (BuySignalId não vazio)
       if(BuySignalId != "" && !BuyEntryHit && buyEntry > 0)
       {
-         // Entrada BUY é ativada quando ASK (preço de compra) atinge ou ultrapassa a linha
-         if(ask >= buyEntry - PriceTolerance)
+         // Entrada BUY é ativada APENAS quando um CANDLE FECHA ACIMA da entrada (rompimento confirmado)
+         // Não basta apenas tocar - precisa FECHAR acima para confirmar o rompimento
+         double previousClose = iClose(_Symbol, PERIOD_CURRENT, 1); // Fechamento do candle anterior
+         if(previousClose > buyEntry)
          {
             BuyEntryHit = true; // Marcar como atingido - NUNCA mais será verificado novamente neste sinal
-            Print("✅ BUY Entry atingida! Preço: ", ask, " | Entry: ", buyEntry);
+            Print("✅ BUY Entry atingida! Candle fechou em: ", previousClose, " | Entry: ", buyEntry);
             Print("📌 EM_OPERACAO ativado para BUY. Entrada não será mais monitorada neste sinal.");
             // Atualizar status para EM_OPERACAO e enviar notificação (apenas uma vez)
             // VERIFICAÇÃO FINAL: Garantir que BuySignalId ainda é válido antes de atualizar
             if(BuySignalId != "")
-               UpdateSignalStatus(BuySignalId, "EM_OPERACAO", ask);
+               UpdateSignalStatus(BuySignalId, "EM_OPERACAO", previousClose);
             else
                Print("⚠️ AVISO: BuySignalId estava vazio ao tentar atualizar EM_OPERACAO!");
          }
@@ -1789,16 +1791,18 @@ void MonitorPriceLevels()
       // CRÍTICO: Só monitora se existe um sinal válido enviado (SellSignalId não vazio)
       if(SellSignalId != "" && !SellEntryHit && sellEntry > 0)
       {
-         // Entrada SELL é ativada quando BID (preço de venda) atinge ou ultrapassa a linha
-         if(bid <= sellEntry + PriceTolerance)
+         // Entrada SELL é ativada APENAS quando um CANDLE FECHA ABAIXO da entrada (rompimento confirmado)
+         // Não basta apenas tocar - precisa FECHAR abaixo para confirmar o rompimento
+         double previousClose = iClose(_Symbol, PERIOD_CURRENT, 1); // Fechamento do candle anterior
+         if(previousClose < sellEntry)
          {
             SellEntryHit = true; // Marcar como atingido - NUNCA mais será verificado novamente neste sinal
-            Print("✅ SELL Entry atingida! Preço: ", bid, " | Entry: ", sellEntry);
+            Print("✅ SELL Entry atingida! Candle fechou em: ", previousClose, " | Entry: ", sellEntry);
             Print("📌 EM_OPERACAO ativado para SELL. Entrada não será mais monitorada neste sinal.");
             // Atualizar status para EM_OPERACAO e enviar notificação (apenas uma vez)
             // VERIFICAÇÃO FINAL: Garantir que SellSignalId ainda é válido antes de atualizar
             if(SellSignalId != "")
-               UpdateSignalStatus(SellSignalId, "EM_OPERACAO", bid);
+               UpdateSignalStatus(SellSignalId, "EM_OPERACAO", previousClose);
             else
                Print("⚠️ AVISO: SellSignalId estava vazio ao tentar atualizar EM_OPERACAO!");
          }
