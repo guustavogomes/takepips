@@ -11,10 +11,8 @@ import { supabase } from '../services/supabaseClient';
 export class AuthRepositorySupabase implements IAuthRepository {
   async register(data: RegisterData): Promise<AuthResponse> {
     try {
-      // Validar senhas
-      if (data.password !== data.confirmPassword) {
-        throw new Error('As senhas não coincidem');
-      }
+      // Nota: confirmPassword não está na interface RegisterData
+      // A validação deve ser feita na UI antes de chamar este método
 
       // Registrar usando Supabase Auth SDK
       const { data: authData, error: authError } = await supabase.auth.signUp({

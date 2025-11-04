@@ -52,8 +52,9 @@ export class ApiClient {
             await AsyncStorage.removeItem(TOKEN_KEY);
           }
           // Erro com resposta do servidor
+          const errorData = error.response.data as any;
           throw new Error(
-            error.response.data?.message || `Server error: ${error.response.status}`
+            errorData?.message || `Server error: ${error.response.status}`
           );
         } else if (error.request) {
           // Requisição feita mas sem resposta

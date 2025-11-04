@@ -16,7 +16,9 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
-  }),
+    shouldShowBanner: true,
+    shouldShowList: true,
+  } as Notifications.NotificationBehavior),
 });
 
 export class NotificationService {
@@ -126,8 +128,8 @@ export class NotificationService {
 
     return {
       remove: () => {
-        Notifications.removeNotificationSubscription(receivedListener);
-        Notifications.removeNotificationSubscription(responseListener);
+        receivedListener.remove();
+        responseListener.remove();
       },
     };
   }
