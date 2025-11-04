@@ -1,7 +1,7 @@
 /**
  * Home Screen - Lista de Sinais
- * 
- * Tela principal que exibe a lista de sinais
+ *
+ * Tela principal que exibe a lista de sinais com dashboard de estatísticas
  */
 
 import React, { useState } from 'react';
@@ -16,6 +16,7 @@ import { useSignals, useActiveSignals } from '@/presentation/hooks/useSignals';
 import { SignalCard } from '@/presentation/components/SignalCard';
 import { LoadingSpinner } from '@/presentation/components/LoadingSpinner';
 import { ErrorView } from '@/presentation/components/ErrorView';
+import { StatsDashboard } from '@/presentation/components/StatsDashboard';
 import { Signal } from '@/domain/models/Signal';
 import { showSuccess } from '@/shared/utils/toast';
 
@@ -44,14 +45,6 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {activeSignals && activeSignals.length > 0 && (
-        <View style={styles.activeSignalsContainer}>
-          <Text style={styles.activeSignalsTitle}>
-            🎯 Sinais Ativos ({activeSignals.length})
-          </Text>
-        </View>
-      )}
-
       <FlatList
         data={signals || []}
         renderItem={({ item }) => (
@@ -63,9 +56,25 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={handleRefresh}
-            tintColor="#4A90E2"
+            tintColor="#FFD700"
+            colors={['#FFD700']}
           />
         }
+        ListHeaderComponent={() => (
+          <>
+            {/* Dashboard de Estatísticas */}
+            <StatsDashboard />
+
+            {/* Sinais Ativos */}
+            {activeSignals && activeSignals.length > 0 && (
+              <View style={styles.activeSignalsContainer}>
+                <Text style={styles.activeSignalsTitle}>
+                  🎯 Sinais Ativos ({activeSignals.length})
+                </Text>
+              </View>
+            )}
+          </>
+        )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyEmoji}>📊</Text>

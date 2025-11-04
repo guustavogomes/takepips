@@ -1,6 +1,18 @@
 import { Signal, CreateSignalData, SignalStatus } from '../entities/Signal';
 
 /**
+ * Estatísticas de performance dos sinais
+ */
+export interface SignalStats {
+  totalPips: number;
+  totalSignals: number;
+  winRate: number;
+  wins: number;
+  losses: number;
+  period: 'today' | '30days' | '90days';
+}
+
+/**
  * Interface do repositório de sinais
  * Segue o princípio de Dependency Inversion (SOLID)
  * A aplicação depende de abstrações, não de implementações concretas
@@ -62,5 +74,12 @@ export interface ISignalRepository {
       stopTicks?: number;
     }
   ): Promise<Signal>;
+
+  /**
+   * Obtém estatísticas de performance dos sinais
+   * @param days Número de dias para calcular (1 = hoje, 30, 90)
+   * @returns Promise com as estatísticas
+   */
+  getStats(days: number): Promise<SignalStats>;
 }
 

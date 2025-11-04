@@ -1,14 +1,21 @@
 /**
  * Infrastructure Layer - Notification Service
- * 
+ *
  * Serviço para gerenciar notificações push nativas do dispositivo
  * Seguindo SRP: Apenas gerencia notificações
+ *
+ * NOTA: Push notifications remotas não funcionam no Expo Go a partir do SDK 53.
+ * Use notificações locais durante desenvolvimento ou crie um development build.
  */
 
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { apiClient } from '../api/apiClient';
+
+// Detectar se está rodando no Expo Go
+const isExpoGo = Constants.appOwnership === 'expo';
 
 // Configurar comportamento das notificações
 Notifications.setNotificationHandler({
@@ -50,10 +57,17 @@ export class NotificationService {
   /**
    * Obtém o token Expo Push
    *
-   * NOTA: Em desenvolvimento com Expo Go, push notifications remotas não funcionam.
-   * Requer EAS Build ou development build para funcionar completamente.
+   * NOTA: Em desenvolvimento com Expo Go (SDK 53+), push notifications remotas não funcionam.
+   * Retorna null no Expo Go para evitar erros.
    */
   async getExpoPushToken(): Promise<string | null> {
+    // Bloquear completamente no Expo Go para evitar erros
+    if (isExpoGo) {
+      console.log('[NotificationService] Expo Go detectado - push notifications remotas não disponíveis');
+      console.log('[NotificationService] Use notificações locais ou crie um development build');
+      return null;
+    }
+
     if (!Device.isDevice) {
       console.log('[NotificationService] Simulador/emulador detectado - push notifications desabilitadas');
       return null;
@@ -65,26 +79,13 @@ export class NotificationService {
     }
 
     try {
-      // Verificar se estamos em um ambiente que suporta push tokens
-      // No Expo Go, isso vai falhar sem projectId do EAS
-      const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: undefined, // Usar undefined explicitamente para desenvolvimento
-      });
+      // Apenas tenta obter token em development builds ou standalone apps
+      const tokenData = await Notifications.getExpoPushTokenAsync();
 
       console.log('[NotificationService] Push token obtido com sucesso');
       return tokenData.data;
     } catch (error: any) {
-      // Erros esperados em desenvolvimento
-      const errorMessage = error?.message || '';
-
-      if (errorMessage.includes('projectId') || errorMessage.includes('experienceId')) {
-        // Isso é normal no Expo Go - não é um erro crítico
-        console.log('[NotificationService] Modo desenvolvimento: Push notifications remotas não disponíveis.');
-        console.log('[NotificationService] Para habilitar: configure EAS Build ou use notificações locais.');
-        return null;
-      }
-
-      // Outros erros são inesperados
+      // Erros inesperados
       console.error('[NotificationService] Erro ao obter push token:', error);
       return null;
     }
