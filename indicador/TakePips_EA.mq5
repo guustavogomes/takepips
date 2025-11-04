@@ -912,7 +912,7 @@ void OnUpdateButtonClick()
 }
 
 //+------------------------------------------------------------------+
-//| Criar botão de reset                                             |
+//| Criar botão de encerramento                                      |
 //+------------------------------------------------------------------+
 void CreateResetButton()
 {
@@ -932,7 +932,7 @@ void CreateResetButton()
       ObjectSetInteger(0, ResetButtonName, OBJPROP_COLOR, clrWhite);
       ObjectSetInteger(0, ResetButtonName, OBJPROP_BORDER_COLOR, clrWhite);
       ObjectSetInteger(0, ResetButtonName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
-      ObjectSetString(0, ResetButtonName, OBJPROP_TEXT, "Resetar");
+      ObjectSetString(0, ResetButtonName, OBJPROP_TEXT, "Encerrar");
       ObjectSetInteger(0, ResetButtonName, OBJPROP_FONTSIZE, 10);
       ObjectSetInteger(0, ResetButtonName, OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, ResetButtonName, OBJPROP_HIDDEN, true);
@@ -941,7 +941,7 @@ void CreateResetButton()
 }
 
 //+------------------------------------------------------------------+
-//| Manipulador de clique no botão de reset                           |
+//| Manipulador de clique no botão de encerramento                   |
 //+------------------------------------------------------------------+
 void OnResetButtonClick()
 {
@@ -954,16 +954,16 @@ void OnResetButtonClick()
    
    if(BuySignalId == "" && SellSignalId == "")
    {
-      Alert("⚠️ Nenhum sinal está sendo monitorado.\n\nNão há nada para resetar.");
-      Print("⚠️ Tentativa de reset sem sinais ativos.");
+      Alert("⚠️ Nenhum sinal está sendo monitorado.\n\nNão há nada para encerrar.");
+      Print("⚠️ Tentativa de encerramento sem sinais ativos.");
       return;
    }
-   
+
    // Confirmar com usuário
-   if(MessageBox("Deseja realmente resetar o monitoramento?\n\nIsso encerrará o(s) sinal(is) e parará o monitoramento.", 
-                 "Confirmar Reset", MB_YESNO | MB_ICONQUESTION) != IDYES)
+   if(MessageBox("Deseja realmente encerrar o monitoramento?\n\nIsso encerrará o(s) sinal(is) e parará o monitoramento.",
+                 "Confirmar Encerramento", MB_YESNO | MB_ICONQUESTION) != IDYES)
    {
-      Print("Reset cancelado pelo usuário.");
+      Print("Encerramento cancelado pelo usuário.");
       return;
    }
    
@@ -972,13 +972,13 @@ void OnResetButtonClick()
    // Isso ajuda a limpar a confusão de logs antigos
    Print("");
    Print("═══════════════════════════════════════════════════════════════");
-   Print("🔄 RESET EXECUTADO - LOG LIMPO");
+   Print("🔄 ENCERRAMENTO EXECUTADO - LOG LIMPO");
    Print("═══════════════════════════════════════════════════════════════");
    Print("");
    Print("");
    Print("");
-   
-   Print("🔄 Resetando monitoramento de sinais...");
+
+   Print("🔄 Encerrando monitoramento de sinais...");
    
    // Encerrar sinal BUY se existir
    if(BuySignalId != "")
@@ -991,9 +991,9 @@ void OnResetButtonClick()
       BuyTake2Hit = false;
       BuyTake3Hit = false;
       BuySignalSent = false;
-      Print("✅ Sinal BUY resetado");
+      Print("✅ Sinal BUY encerrado");
    }
-   
+
    // Encerrar sinal SELL se existir
    if(SellSignalId != "")
    {
@@ -1005,21 +1005,21 @@ void OnResetButtonClick()
       SellTake2Hit = false;
       SellTake3Hit = false;
       SellSignalSent = false;
-      Print("✅ Sinal SELL resetado");
+      Print("✅ Sinal SELL encerrado");
    }
    
    // Limpar mensagem do gráfico
    Comment("");
    
    Print("═══════════════════════════════════════════════════════════════");
-   Print("✅ Reset concluído! Todos os estados foram limpos.");
+   Print("✅ Encerramento concluído! Monitoramento finalizado.");
    Print("📌 Pronto para enviar novos sinais manualmente.");
    Print("═══════════════════════════════════════════════════════════════");
    Print("");
    Print("");
    Print("");
-   
-   Alert("✅ Monitoramento resetado!\n\nOs sinais foram encerrados e você pode enviar novos sinais.");
+
+   Alert("✅ Monitoramento encerrado!\n\nOs sinais foram finalizados e você pode enviar novos sinais.");
 }
 
 //+------------------------------------------------------------------+
