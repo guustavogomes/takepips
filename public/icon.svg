@@ -1,62 +1,114 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background -->
-  <rect width="512" height="512" rx="128" fill="#0f172a"/>
-  
-  <!-- Gradient background circle -->
-  <circle cx="256" cy="256" r="240" fill="url(#gradient1)" opacity="0.3"/>
-  
-  <!-- Chart area background -->
-  <rect x="80" y="120" width="352" height="272" rx="24" fill="#1e293b" opacity="0.8"/>
-  
+  <!-- Background with gradient -->
+  <rect width="512" height="512" rx="128" fill="#0a0e1a"/>
+
+  <!-- Radial gradient background -->
+  <circle cx="256" cy="256" r="240" fill="url(#radialGold)" opacity="0.15"/>
+
+  <!-- Chart container -->
+  <rect x="60" y="100" width="392" height="280" rx="20" fill="#0f1419" opacity="0.8"/>
+
   <!-- Grid lines -->
-  <line x1="120" y1="180" x2="400" y2="180" stroke="#334155" stroke-width="2" opacity="0.5"/>
-  <line x1="120" y1="240" x2="400" y2="240" stroke="#334155" stroke-width="2" opacity="0.5"/>
-  <line x1="120" y1="300" x2="400" y2="300" stroke="#334155" stroke-width="2" opacity="0.5"/>
-  <line x1="120" y1="360" x2="400" y2="360" stroke="#334155" stroke-width="2" opacity="0.5"/>
-  
-  <!-- Ascending chart line (Take Profit) -->
-  <path d="M 120 360 L 160 340 L 200 300 L 240 260 L 280 220 L 320 180 L 360 160 L 400 140" 
-        stroke="#10b981" 
-        stroke-width="8" 
-        fill="none" 
-        stroke-linecap="round" 
-        stroke-linejoin="round"/>
-  
-  <!-- Filled area under chart -->
-  <path d="M 120 360 L 160 340 L 200 300 L 240 260 L 280 220 L 320 180 L 360 160 L 400 140 L 400 360 L 120 360 Z" 
-        fill="url(#gradient2)" 
-        opacity="0.3"/>
-  
-  <!-- Chart points (dots) -->
-  <circle cx="120" cy="360" r="6" fill="#10b981"/>
-  <circle cx="160" cy="340" r="6" fill="#10b981"/>
-  <circle cx="200" cy="300" r="6" fill="#10b981"/>
-  <circle cx="240" cy="260" r="6" fill="#10b981"/>
-  <circle cx="280" cy="220" r="6" fill="#10b981"/>
-  <circle cx="320" cy="180" r="6" fill="#10b981"/>
-  <circle cx="360" cy="160" r="6" fill="#10b981"/>
-  <circle cx="400" cy="140" r="8" fill="#6366f1"/>
-  
-  <!-- "TP" text (TakePips) -->
-  <text x="256" y="440" 
-        font-family="Arial, sans-serif" 
-        font-size="72" 
-        font-weight="bold" 
-        fill="#6366f1" 
+  <line x1="100" y1="160" x2="420" y2="160" stroke="#1a1f2e" stroke-width="1.5" opacity="0.6"/>
+  <line x1="100" y1="220" x2="420" y2="220" stroke="#1a1f2e" stroke-width="1.5" opacity="0.6"/>
+  <line x1="100" y1="280" x2="420" y2="280" stroke="#1a1f2e" stroke-width="1.5" opacity="0.6"/>
+  <line x1="100" y1="340" x2="420" y2="340" stroke="#1a1f2e" stroke-width="1.5" opacity="0.6"/>
+
+  <!-- Candlestick 1 (Bullish) -->
+  <line x1="130" y1="290" x2="130" y2="250" stroke="#FFD700" stroke-width="2"/>
+  <rect x="120" y="270" width="20" height="30" fill="#FFD700" rx="2"/>
+  <line x1="130" y1="270" x2="130" y2="240" stroke="#FFD700" stroke-width="2"/>
+
+  <!-- Candlestick 2 (Bullish) -->
+  <line x1="180" y1="310" x2="180" y2="260" stroke="#FFD700" stroke-width="2"/>
+  <rect x="170" y="280" width="20" height="40" fill="#FFD700" rx="2"/>
+  <line x1="180" y1="280" x2="180" y2="250" stroke="#FFD700" stroke-width="2"/>
+
+  <!-- Candlestick 3 (Strong Bullish) -->
+  <line x1="230" y1="300" x2="230" y2="200" stroke="#FDB931" stroke-width="2"/>
+  <rect x="220" y="240" width="20" height="60" fill="#FDB931" rx="2"/>
+  <line x1="230" y1="240" x2="230" y2="190" stroke="#FDB931" stroke-width="2"/>
+
+  <!-- Candlestick 4 (Bullish) -->
+  <line x1="280" y1="280" x2="280" y2="180" stroke="#FFD700" stroke-width="2"/>
+  <rect x="270" y="210" width="20" height="60" fill="#FFD700" rx="2"/>
+  <line x1="280" y1="210" x2="280" y2="170" stroke="#FFD700" stroke-width="2"/>
+
+  <!-- Candlestick 5 (Strong Bullish - Highlight) -->
+  <line x1="330" y1="260" x2="330" y2="140" stroke="#FDB931" stroke-width="3"/>
+  <rect x="318" y="170" width="24" height="80" fill="url(#goldGradient)" rx="3"/>
+  <line x1="330" y1="170" x2="330" y2="130" stroke="#FDB931" stroke-width="3"/>
+
+  <!-- Glow effect on main candlestick -->
+  <rect x="318" y="170" width="24" height="80" fill="#FFD700" opacity="0.3" rx="3" filter="url(#glow)"/>
+
+  <!-- Candlestick 6 (Bullish) -->
+  <line x1="380" y1="240" x2="380" y2="160" stroke="#FFD700" stroke-width="2"/>
+  <rect x="370" y="180" width="20" height="50" fill="#FFD700" rx="2"/>
+  <line x1="380" y1="180" x2="380" y2="150" stroke="#FFD700" stroke-width="2"/>
+
+  <!-- Trend line (ascending) -->
+  <path d="M 100 320 L 150 300 L 200 270 L 250 230 L 300 200 L 350 160 L 400 140"
+        stroke="#10b981"
+        stroke-width="3"
+        fill="none"
+        stroke-linecap="round"
+        stroke-dasharray="8,4"
+        opacity="0.6"/>
+
+  <!-- Gold symbol circle background -->
+  <circle cx="256" cy="430" r="55" fill="url(#goldGradient)" opacity="0.2"/>
+  <circle cx="256" cy="430" r="50" fill="#0f1419"/>
+  <circle cx="256" cy="430" r="50" stroke="url(#goldGradient)" stroke-width="4" fill="none"/>
+
+  <!-- "AU" text (Gold symbol) with "79" atomic number -->
+  <text x="256" y="440"
+        font-family="'Arial', sans-serif"
+        font-size="42"
+        font-weight="bold"
+        fill="url(#goldGradient)"
         text-anchor="middle"
-        letter-spacing="4">TP</text>
-  
-  <!-- Gradients -->
+        letter-spacing="1">AU</text>
+  <text x="256" y="420"
+        font-family="'Arial', sans-serif"
+        font-size="14"
+        font-weight="normal"
+        fill="#FFD700"
+        text-anchor="middle"
+        opacity="0.8">79</text>
+
+  <!-- Small "GOLD" text below -->
+  <text x="256" y="465"
+        font-family="'Arial', sans-serif"
+        font-size="12"
+        font-weight="600"
+        fill="#DAA520"
+        text-anchor="middle"
+        letter-spacing="3"
+        opacity="0.7">GOLD</text>
+
+  <!-- Definitions -->
   <defs>
-    <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#8b5cf6;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#ec4899;stop-opacity:1" />
+    <!-- Radial gradient for background -->
+    <radialGradient id="radialGold" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#DAA520;stop-opacity:0" />
+    </radialGradient>
+
+    <!-- Linear gradient for gold elements -->
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#FDB931;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#DAA520;stop-opacity:1" />
     </linearGradient>
-    <linearGradient id="gradient2" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#10b981;stop-opacity:0.6" />
-      <stop offset="100%" style="stop-color:#10b981;stop-opacity:0" />
-    </linearGradient>
+
+    <!-- Glow filter -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
 </svg>
-

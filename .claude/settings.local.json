@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /b C:Projetostakepipspublic)",
+      "Bash(node scripts/generate-icons.js:*)",
+      "Bash(npm install:*)",
+      "Bash(node scripts/generate-favicon.js:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(awk:*)",
+      "Bash(ls:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

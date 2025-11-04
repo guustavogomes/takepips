@@ -1,10 +1,31 @@
-# 🎨 Gerar Ícones do PWA
+# 🎨 Assets do TakePips - Sinais de GOLD/Forex
 
-## 📋 Método 1: Usando o SVG fornecido (Recomendado)
+## 🏆 Design Atual
 
-O arquivo `public/icon.svg` está pronto! Use uma das opções abaixo:
+Os assets foram redesenhados com foco em sinais de trading de GOLD (XAU/USD):
 
-### Opção A: Conversor Online (Mais fácil)
+- **Tema**: Ouro/Trading profissional
+- **Cores**: Gradientes dourados (#FFD700, #FDB931, #DAA520)
+- **Elementos**: Candlesticks ascendentes + símbolo AU (Gold)
+- **Estilo**: Moderno, profissional, dark theme
+
+## ⚡ Método Recomendado (Automatizado)
+
+O arquivo `public/icon.svg` está pronto! Execute o script automatizado:
+
+```bash
+# Gerar todos os ícones PNG a partir do SVG
+node scripts/generate-icons.js
+
+# Gerar o favicon.ico
+node scripts/generate-favicon.js
+```
+
+Pronto! Todos os assets serão gerados automaticamente em `public/`.
+
+## 📋 Métodos Alternativos
+
+### Opção A: Conversor Online
 
 1. Acesse: https://convertio.co/pt/svg-png/ ou https://cloudconvert.com/svg-to-png
 2. Faça upload do arquivo `public/icon.svg`
