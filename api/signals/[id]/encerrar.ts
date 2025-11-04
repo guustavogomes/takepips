@@ -33,18 +33,6 @@ export default async function handler(
       return;
     }
 
-    if (!process.env.DATABASE_URL) {
-      console.error('[ERROR] DATABASE_URL não está configurada');
-      res.status(500).json({
-        success: false,
-        error: {
-          message: 'Configuração do servidor incompleta. Contate o administrador.',
-          code: 'CONFIGURATION_ERROR',
-        },
-      });
-      return;
-    }
-
     const { id } = req.query;
     if (!id || typeof id !== 'string') {
       res.status(400).json({
@@ -72,33 +60,9 @@ export default async function handler(
       return;
     }
 
-    // Atualizar status para ENCERRADO usando SQL direto (não precisa de hitPrice)
-    const sql = neon(process.env.DATABASE_URL);
-    const now = new Date();
-    
-    const result = await sql`
-      UPDATE signals 
-      SET status = 'ENCERRADO', 
-          updated_at = ${now.toISOString()}
-      WHERE id = ${id}
-      RETURNING *
-    ` as Record<string, any>[];
-
-    if (!result || result.length === 0) {
-      res.status(404).json({
-        success: false,
-        error: {
-          message: 'Sinal não encontrado ou falha ao atualizar',
-          code: 'UPDATE_FAILED',
-        },
-      });
-      return;
-    }
-
-    const updatedSignal = await signalRepository.findById(id);
-    if (!updatedSignal) {
-      throw new Error('Erro ao buscar sinal atualizado');
-    }
+    // Atualizar status para ENCERRADO usando o repositório
+    // Usar hitPrice = 0 já que não é necessário para ENCERRADO
+    const updatedSignal = await signalRepository.updateStatus(id, 'ENCERRADO', 0);
 
     res.status(200).json({
       success: true,

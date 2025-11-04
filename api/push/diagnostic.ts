@@ -1,5 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { neon } from '@neondatabase/serverless';
+import { createClient } from '@supabase/supabase-js';
 
 /**
  * API Route de diagnóstico para verificar o estado do sistema de notificações
@@ -40,7 +40,8 @@ export default async function handler(
         subject: process.env.VAPID_SUBJECT || 'Não configurada',
       },
       database: {
-        url: process.env.DATABASE_URL ? '✅ Configurada' : '❌ Não configurada',
+        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? '✅ Configurada' : '❌ Não configurada',
+        serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ Configurada' : '❌ Não configurada',
       },
       subscriptions: {
         count: 0,
@@ -49,47 +50,51 @@ export default async function handler(
     };
 
     // Verificar subscriptions no banco
-    if (process.env.DATABASE_URL) {
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       try {
-        const sql = neon(process.env.DATABASE_URL);
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL,
+          process.env.SUPABASE_SERVICE_ROLE_KEY,
+          {
+            auth: {
+              autoRefreshToken: false,
+              persistSession: false,
+            },
+          }
+        );
         
-        // Verificar se a tabela existe
-        const tableCheck = await sql`
-          SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_schema = 'public' 
-            AND table_name = 'push_subscriptions'
-          );
-        `;
-
-        const tableExists = tableCheck[0]?.exists || false;
-
-        if (!tableExists) {
-          diagnostic.subscriptions.error = 'Tabela push_subscriptions não existe. Execute a migration.';
-          diagnostic.subscriptions.tableExists = false;
-        } else {
-          diagnostic.subscriptions.tableExists = true;
-          
-          // Contar subscriptions
-          const countResult = await sql`
-            SELECT COUNT(*) as count FROM push_subscriptions
-          `;
-          
-          diagnostic.subscriptions.count = parseInt(countResult[0]?.count || '0', 10);
-          
-          // Listar subscriptions recentes
-          const recentSubs = await sql`
-            SELECT 
-              LEFT(endpoint, 50) as endpoint_preview,
-              created_at,
-              updated_at
-            FROM push_subscriptions
-            ORDER BY created_at DESC
-            LIMIT 5
-          `;
-          
-          diagnostic.subscriptions.recent = recentSubs;
-        }
+        // Contar subscriptions Web Push
+        const { count: webPushCount } = await supabase
+          .from('push_subscriptions')
+          .select('*', { count: 'exact', head: true });
+        
+        // Contar tokens Expo Push
+        const { count: expoCount } = await supabase
+          .from('expo_push_tokens')
+          .select('*', { count: 'exact', head: true });
+        
+        diagnostic.subscriptions.count = (webPushCount || 0) + (expoCount || 0);
+        diagnostic.subscriptions.webPush = webPushCount || 0;
+        diagnostic.subscriptions.expoPush = expoCount || 0;
+        
+        // Listar subscriptions recentes (Web Push)
+        const { data: recentWebPush } = await supabase
+          .from('push_subscriptions')
+          .select('endpoint, created_at, updated_at')
+          .order('created_at', { ascending: false })
+          .limit(5);
+        
+        // Listar tokens recentes (Expo Push)
+        const { data: recentExpo } = await supabase
+          .from('expo_push_tokens')
+          .select('token, platform, created_at, updated_at')
+          .order('created_at', { ascending: false })
+          .limit(5);
+        
+        diagnostic.subscriptions.recent = {
+          webPush: recentWebPush || [],
+          expoPush: recentExpo || [],
+        };
       } catch (error: any) {
         diagnostic.subscriptions.error = error.message;
         console.error('[DIAGNOSTIC] Erro ao verificar subscriptions:', error);
