@@ -47,7 +47,18 @@ export function useRegister() {
 export function useCurrentUser() {
   return useQuery({
     queryKey: authKeys.user(),
-    queryFn: () => authRepository.getCurrentUser(),
+    queryFn: async () => {
+      try {
+        return await authRepository.getCurrentUser();
+      } catch (error) {
+        console.error('[useCurrentUser] Error:', error);
+        return null; // Retornar null em caso de erro para não travar
+      }
+    },
     staleTime: Infinity,
+    retry: 1, // Apenas 1 tentativa
+    retryDelay: 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 }

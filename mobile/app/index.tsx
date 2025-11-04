@@ -1,20 +1,12 @@
 /**
- * Root Index - Redireciona baseado no estado de autenticação
+ * Root Index - Redireciona sempre para splash
+ * 
+ * O splash screen é responsável por verificar autenticação e redirecionar
  */
 
 import { Redirect } from 'expo-router';
-import { useCurrentUser } from '@/presentation/hooks/useAuth';
 
 export default function Index() {
-  const { data: user, isLoading } = useCurrentUser();
-
-  if (isLoading) {
-    return null; // Mostrar splash enquanto carrega
-  }
-
-  if (user) {
-    return <Redirect href="/(tabs)" />;
-  }
-
+  // Sempre redirecionar para splash, que gerencia a lógica de autenticação
   return <Redirect href="/(auth)/splash" />;
 }

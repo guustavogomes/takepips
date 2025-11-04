@@ -71,30 +71,45 @@ export default function SplashScreenComponent() {
   }, []);
 
   useEffect(() => {
-    // Aguardar verificação de autenticação e mínimo 3.5 segundos de splash
-    // Para que o usuário possa ver a animação bonita
-    const minSplashTime = 3500;
+    // Aguardar verificação de autenticação e mínimo 1.5 segundos de splash
+    const minSplashTime = 1500;
+    const maxWaitTime = 3000; // Timeout máximo de 3 segundos para não travar
     const startTime = Date.now();
 
     const checkAuth = async () => {
+      // Aguardar até que o loading termine ou timeout (não mais que 3 segundos)
+      const waitStart = Date.now();
+      while (isLoading && (Date.now() - waitStart) < maxWaitTime) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      // Se ainda está carregando após timeout, prosseguir mesmo assim
       const elapsed = Date.now() - startTime;
       const remaining = Math.max(0, minSplashTime - elapsed);
 
       await new Promise((resolve) => setTimeout(resolve, remaining));
 
-      SplashScreen.hideAsync();
-
-      if (user) {
-        router.replace('/(tabs)');
-      } else {
-        router.replace('/(auth)/login');
+      // Esconder splash screen nativa
+      try {
+        await SplashScreen.hideAsync();
+      } catch (error) {
+        console.warn('[Splash] Error hiding splash:', error);
       }
+
+      // Redirecionar baseado no estado de autenticação
+      // Usar setTimeout para garantir que o hideAsync foi processado
+      setTimeout(() => {
+        if (user) {
+          router.replace('/(tabs)');
+        } else {
+          router.replace('/(auth)/login');
+        }
+      }, 100);
     };
 
-    if (!isLoading) {
-      checkAuth();
-    }
-  }, [user, isLoading]);
+    // Iniciar verificação imediatamente
+    checkAuth();
+  }, [user, isLoading, router]);
 
   // Posição das candles
   const candleUpTranslateY = candleUpAnim.interpolate({
