@@ -7,7 +7,8 @@
       "Bash(node scripts/generate-favicon.js:*)",
       "Bash(npm uninstall:*)",
       "Bash(awk:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(node scripts/generate-mobile-assets.js:*)"
     ],
     "deny": [],
     "ask": []

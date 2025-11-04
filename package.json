@@ -11,7 +11,9 @@
     "migrate": "node -r dotenv/config scripts/migrate.js",
     "generate:icons": "node scripts/generate-icons.js && node scripts/generate-favicon.js",
     "generate:icons:png": "node scripts/generate-icons.js",
-    "generate:favicon": "node scripts/generate-favicon.js"
+    "generate:favicon": "node scripts/generate-favicon.js",
+    "generate:mobile": "node scripts/generate-mobile-assets.js",
+    "generate:all": "npm run generate:icons && npm run generate:mobile"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.0",

@@ -1,37 +1,61 @@
-# Assets do TakePips Mobile
+# 🎨 Assets do TakePips Mobile
 
-Esta pasta contém os assets (imagens, ícones) do aplicativo.
+Esta pasta contém os assets (imagens, ícones) do aplicativo mobile React Native/Expo.
 
-## Arquivos Necessários
+## ✅ Arquivos Gerados
 
-Você precisa adicionar os seguintes arquivos:
+Todos os assets necessários foram gerados automaticamente com o **tema GOLD**:
 
-1. **icon.png** (1024x1024px) - Ícone principal do app
-2. **splash.png** (1284x2778px para iOS, qualquer tamanho) - Tela de splash
-3. **adaptive-icon.png** (1024x1024px) - Ícone adaptativo para Android
-4. **favicon.png** (48x48px) - Favicon para web
-5. **notification-icon.png** (96x96px) - Ícone para notificações
+1. ✅ **icon.png** (1024×1024px, 39 KB) - Ícone principal do app
+2. ✅ **splash.png** (1284×2778px, 20 KB) - Tela de splash/abertura
+3. ✅ **adaptive-icon.png** (1024×1024px, 39 KB) - Ícone adaptativo para Android
+4. ✅ **favicon.png** (48×48px, 2 KB) - Favicon para web
 
-## Como Criar/Adicionar
+## 🎨 Design
 
-1. **Usar gerador online:**
-   - https://realfavicongenerator.net/
-   - https://www.favicon-generator.org/
+Todos os assets usam o mesmo design do PWA web:
+- **Tema**: GOLD/Forex profissional
+- **Elementos**: Candlesticks dourados + símbolo AU (Gold)
+- **Cores**: Gradientes dourados (#FFD700, #FDB931, #DAA520)
+- **Background**: Dark theme (#0A0E27, #0a0e1a)
 
-2. **Criar manualmente:**
-   - Use um editor de imagens (Photoshop, Figma, etc.)
-   - Exporte nos tamanhos especificados acima
-   - Salve na pasta `assets/`
+## 🔄 Regenerar Assets
 
-## Placeholders Temporários
+Para regenerar todos os assets do mobile:
 
-Por enquanto, os arquivos estão como placeholders vazios. O app pode funcionar, mas você verá erros ou imagens em branco.
+```bash
+# Na raiz do projeto (não no diretório mobile)
+node scripts/generate-mobile-assets.js
 
-**Para desenvolvimento rápido, você pode:**
-- Copiar imagens do app-news (se tiver acesso)
-- Usar qualquer imagem temporária para testar
-- Criar imagens simples coloridas com o nome do app
+# Ou usando npm
+npm run generate:mobile
+```
 
-## Nota
+## 📱 Uso no Expo
 
-O arquivo `notification-sound.wav` também é referenciado, mas é opcional. Se não adicionar, as notificações funcionarão sem som personalizado.
+Os assets estão configurados em `mobile/app.json`:
+- **icon**: Usado no iOS e Android
+- **adaptive-icon**: Específico para Android (Material Design)
+- **splash**: Tela de carregamento inicial
+- **favicon**: Para versão web do Expo
+
+## ✏️ Personalizar Design
+
+Para modificar o design dos assets:
+
+1. Edite o arquivo SVG fonte: `public/icon.svg`
+2. Execute o script de geração: `node scripts/generate-mobile-assets.js`
+3. Os PNGs serão regenerados automaticamente
+
+## 📐 Especificações
+
+- **icon.png**: 1024×1024px, PNG com background
+- **adaptive-icon.png**: 1024×1024px, PNG com background (Android Oreo+)
+- **splash.png**: 1284×2778px, PNG otimizado (iPhone 14 Pro Max)
+- **favicon.png**: 48×48px, PNG para web
+
+---
+
+**Última atualização**: 2025-11-03
+**Tema**: GOLD Trading Signals
+**Gerado automaticamente**: scripts/generate-mobile-assets.js
