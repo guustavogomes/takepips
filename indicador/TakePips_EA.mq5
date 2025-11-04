@@ -47,7 +47,8 @@ string SellStopLossLine = LinePrefix + "SellStopLoss";
 string SellTake1Line = LinePrefix + "SellTake1";
 string SellTake2Line = LinePrefix + "SellTake2";
 string SellTake3Line = LinePrefix + "SellTake3";
-string ButtonName = LinePrefix + "SendButton";
+string BuyButtonName = LinePrefix + "BuyButton";
+string SellButtonName = LinePrefix + "SellButton";
 string UpdateButtonName = LinePrefix + "UpdateButton";
 string ResetButtonName = LinePrefix + "ResetButton";
 
@@ -172,7 +173,7 @@ int OnInit()
    
    Print("✅ Todos os estados foram limpos!");
    Print("🔒 AutoSendSignals: ", AutoSendSignals, " | Sinais automáticos: ", AutoSendSignals ? "ATIVADO" : "DESATIVADO");
-   Print("📌 IMPORTANTE: O EA começará SEM histórico. Envie sinais manualmente usando o botão 'Enviar Sinal'.");
+   Print("📌 IMPORTANTE: O EA começará SEM histórico. Use os botões '📈 COMPRA' ou '📉 VENDA' para enviar sinais.");
    
    // Registrar tempo de inicialização para bloquear envio imediato
    initializationTime = TimeCurrent();
@@ -183,9 +184,10 @@ int OnInit()
    
    // Atualizar cores das linhas existentes para refletir configurações personalizadas
    UpdateLineColors();
-   
+
    // Criar botões
-   CreateSendButton();
+   CreateBuyButton();
+   CreateSellButton();
    CreateUpdateButton();
    CreateResetButton();
    
@@ -233,9 +235,10 @@ void OnDeinit(const int reason)
    ObjectDelete(0, SellTake1Line + "_Label");
    ObjectDelete(0, SellTake2Line + "_Label");
    ObjectDelete(0, SellTake3Line + "_Label");
-   
+
    // Deletar botões
-   ObjectDelete(0, ButtonName);
+   ObjectDelete(0, BuyButtonName);
+   ObjectDelete(0, SellButtonName);
    ObjectDelete(0, UpdateButtonName);
    ObjectDelete(0, ResetButtonName);
    
@@ -255,9 +258,13 @@ void OnChartEvent(const int id,
 {
    if(id == CHARTEVENT_OBJECT_CLICK)
    {
-      if(sparam == ButtonName)
+      if(sparam == BuyButtonName)
       {
-         OnSendButtonClick();
+         OnBuyButtonClick();
+      }
+      else if(sparam == SellButtonName)
+      {
+         OnSellButtonClick();
       }
       else if(sparam == UpdateButtonName)
       {
@@ -369,7 +376,7 @@ void OnTick()
       if(firstAutoBlockWarning)
       {
          Print("🔒 Envio automático bloqueado: Nenhum sinal foi enviado manualmente ainda.");
-         Print("📌 Primeiro envie um sinal manualmente usando o botão 'Enviar Sinal', depois o envio automático será habilitado.");
+         Print("📌 Primeiro envie um sinal manualmente usando os botões '📈 COMPRA' ou '📉 VENDA', depois o envio automático será habilitado.");
          firstAutoBlockWarning = false;
       }
       return; // Bloquear envio automático até que haja um sinal manual
@@ -400,8 +407,8 @@ void OnTick()
    
    // Verificar se preço atingiu linha de entrada BUY
    // IMPORTANTE: Só enviar BUY automaticamente se já existe um sinal SELL sendo monitorado
-   // Ou se já existe um BUY sendo monitorado (para re-envio após reset)
-   if(!BuySignalSent && (SellSignalId != "" || BuySignalId != ""))
+   // NÃO re-enviar BUY se já tem BUY ativo (evita sobrescrever o ID atual)
+   if(!BuySignalSent && BuySignalId == "" && SellSignalId != "")
    {
       double buyEntry = ObjectGetDouble(0, BuyEntryLine, OBJPROP_PRICE);
       if(buyEntry > 0)
@@ -414,11 +421,11 @@ void OnTick()
          }
       }
    }
-   
+
    // Verificar se preço atingiu linha de entrada SELL
    // IMPORTANTE: Só enviar SELL automaticamente se já existe um sinal BUY sendo monitorado
-   // Ou se já existe um SELL sendo monitorado (para re-envio após reset)
-   if(!SellSignalSent && (BuySignalId != "" || SellSignalId != ""))
+   // NÃO re-enviar SELL se já tem SELL ativo (evita sobrescrever o ID atual)
+   if(!SellSignalSent && SellSignalId == "" && BuySignalId != "")
    {
       double sellEntry = ObjectGetDouble(0, SellEntryLine, OBJPROP_PRICE);
       if(sellEntry > 0)
@@ -748,30 +755,59 @@ void UpdateLineColors()
 }
 
 //+------------------------------------------------------------------+
-//| Criar botão de envio                                            |
+//| Criar botão de compra (BUY)                                     |
 //+------------------------------------------------------------------+
-void CreateSendButton()
+void CreateBuyButton()
 {
    int x = 10;
    int y = 30;
    int width = 150;
    int height = 30;
-   
-   if(ObjectFind(0, ButtonName) < 0)
+
+   if(ObjectFind(0, BuyButtonName) < 0)
    {
-      ObjectCreate(0, ButtonName, OBJ_BUTTON, 0, 0, 0);
-      ObjectSetInteger(0, ButtonName, OBJPROP_XDISTANCE, x);
-      ObjectSetInteger(0, ButtonName, OBJPROP_YDISTANCE, y);
-      ObjectSetInteger(0, ButtonName, OBJPROP_XSIZE, width);
-      ObjectSetInteger(0, ButtonName, OBJPROP_YSIZE, height);
-      ObjectSetInteger(0, ButtonName, OBJPROP_BGCOLOR, clrDodgerBlue);
-      ObjectSetInteger(0, ButtonName, OBJPROP_COLOR, clrWhite);
-      ObjectSetInteger(0, ButtonName, OBJPROP_BORDER_COLOR, clrWhite);
-      ObjectSetInteger(0, ButtonName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
-      ObjectSetString(0, ButtonName, OBJPROP_TEXT, "Enviar Sinal");
-      ObjectSetInteger(0, ButtonName, OBJPROP_FONTSIZE, 10);
-      ObjectSetInteger(0, ButtonName, OBJPROP_SELECTABLE, false);
-      ObjectSetInteger(0, ButtonName, OBJPROP_SELECTED, false);
+      ObjectCreate(0, BuyButtonName, OBJ_BUTTON, 0, 0, 0);
+      ObjectSetInteger(0, BuyButtonName, OBJPROP_XDISTANCE, x);
+      ObjectSetInteger(0, BuyButtonName, OBJPROP_YDISTANCE, y);
+      ObjectSetInteger(0, BuyButtonName, OBJPROP_XSIZE, width);
+      ObjectSetInteger(0, BuyButtonName, OBJPROP_YSIZE, height);
+      ObjectSetInteger(0, BuyButtonName, OBJPROP_BGCOLOR, clrLimeGreen); // Verde
+      ObjectSetInteger(0, BuyButtonName, OBJPROP_COLOR, clrWhite);
+      ObjectSetInteger(0, BuyButtonName, OBJPROP_BORDER_COLOR, clrWhite);
+      ObjectSetInteger(0, BuyButtonName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
+      ObjectSetString(0, BuyButtonName, OBJPROP_TEXT, "📈 COMPRA");
+      ObjectSetInteger(0, BuyButtonName, OBJPROP_FONTSIZE, 11);
+      ObjectSetInteger(0, BuyButtonName, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, BuyButtonName, OBJPROP_SELECTED, false);
+      ChartRedraw();
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Criar botão de venda (SELL)                                      |
+//+------------------------------------------------------------------+
+void CreateSellButton()
+{
+   int x = 170; // Ao lado do botão de compra
+   int y = 30;
+   int width = 150;
+   int height = 30;
+
+   if(ObjectFind(0, SellButtonName) < 0)
+   {
+      ObjectCreate(0, SellButtonName, OBJ_BUTTON, 0, 0, 0);
+      ObjectSetInteger(0, SellButtonName, OBJPROP_XDISTANCE, x);
+      ObjectSetInteger(0, SellButtonName, OBJPROP_YDISTANCE, y);
+      ObjectSetInteger(0, SellButtonName, OBJPROP_XSIZE, width);
+      ObjectSetInteger(0, SellButtonName, OBJPROP_YSIZE, height);
+      ObjectSetInteger(0, SellButtonName, OBJPROP_BGCOLOR, clrCrimson); // Vermelho
+      ObjectSetInteger(0, SellButtonName, OBJPROP_COLOR, clrWhite);
+      ObjectSetInteger(0, SellButtonName, OBJPROP_BORDER_COLOR, clrWhite);
+      ObjectSetInteger(0, SellButtonName, OBJPROP_CORNER, CORNER_LEFT_LOWER);
+      ObjectSetString(0, SellButtonName, OBJPROP_TEXT, "📉 VENDA");
+      ObjectSetInteger(0, SellButtonName, OBJPROP_FONTSIZE, 11);
+      ObjectSetInteger(0, SellButtonName, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, SellButtonName, OBJPROP_SELECTED, false);
       ChartRedraw();
    }
 }
@@ -781,7 +817,7 @@ void CreateSendButton()
 //+------------------------------------------------------------------+
 void CreateUpdateButton()
 {
-   int x = 170; // Ao lado do botão de envio
+   int x = 330; // Ao lado dos botões de compra/venda
    int y = 30;
    int width = 150;
    int height = 30;
@@ -816,28 +852,62 @@ void OnUpdateButtonClick()
       Print("❌ Tentativa de atualização bloqueada. EA não habilitado.");
       return;
    }
-   
-   if(BuySignalId == "" && SellSignalId == "")
+
+   // Verificar se há sinais ativos (não encerrados)
+   // Um sinal é considerado encerrado se atingiu QUALQUER take (1, 2 ou 3) ou stop loss
+   bool hasBuyActive = (BuySignalId != "" && !BuyTake1Hit && !BuyTake2Hit && !BuyTake3Hit && !BuyStopHit);
+   bool hasSellActive = (SellSignalId != "" && !SellTake1Hit && !SellTake2Hit && !SellTake3Hit && !SellStopHit);
+
+   if(!hasBuyActive && !hasSellActive)
    {
-      Alert("⚠️ Nenhum sinal foi enviado ainda.\n\nPrimeiro envie um sinal usando o botão 'Enviar Sinal'.");
-      Print("⚠️ Tentativa de atualizar sem sinal enviado.");
+      if(BuySignalId == "" && SellSignalId == "")
+      {
+         Alert("⚠️ Nenhum sinal ativo para atualizar.\n\nUse os botões '📈 COMPRA' ou '📉 VENDA' para enviar novos sinais.");
+         Print("⚠️ Tentativa de atualizar sem sinal ativo.");
+      }
+      else
+      {
+         Alert("⚠️ Os sinais já foram encerrados (Take ou Stop Loss atingido).\n\nNão é possível atualizar sinais que já atingiram algum alvo.");
+         Print("⚠️ Sinais já encerrados.");
+         if(BuySignalId != "")
+            Print("BUY - Take1:", BuyTake1Hit, " Take2:", BuyTake2Hit, " Take3:", BuyTake3Hit, " Stop:", BuyStopHit);
+         if(SellSignalId != "")
+            Print("SELL - Take1:", SellTake1Hit, " Take2:", SellTake2Hit, " Take3:", SellTake3Hit, " Stop:", SellStopHit);
+      }
       return;
    }
-   
-   Print("📝 Atualizando sinais...");
+
+   Print("📝 Atualizando sinais ativos...");
+
+   // Mostrar quais sinais serão atualizados
+   if(hasBuyActive)
+      Print("📊 Atualizando sinal BUY ativo (ID: ", BuySignalId, ")");
+
+   if(hasSellActive)
+      Print("📊 Atualizando sinal SELL ativo (ID: ", SellSignalId, ")");
+
+   // Atualizar sinais (a função já verifica internamente quais IDs existem)
    UpdateSignalFromLines();
-   
-   if(BuySignalId != "" && SellSignalId != "")
+
+   // Mensagem de sucesso
+   if(hasBuyActive && hasSellActive)
    {
-      Alert("✅ Sinais BUY e SELL atualizados com sucesso!");
+      Alert("✅ Sinais BUY e SELL atualizados com sucesso!\n\n",
+            "BUY: ID ", StringSubstr(BuySignalId, 0, 8), "...\n",
+            "SELL: ID ", StringSubstr(SellSignalId, 0, 8), "...");
+      Print("✅ 2 sinais atualizados com sucesso!");
    }
-   else if(BuySignalId != "")
+   else if(hasBuyActive)
    {
-      Alert("✅ Sinal BUY atualizado com sucesso!");
+      Alert("✅ Sinal de COMPRA atualizado com sucesso!\n\n",
+            "ID: ", StringSubstr(BuySignalId, 0, 8), "...");
+      Print("✅ Sinal BUY atualizado com sucesso!");
    }
-   else if(SellSignalId != "")
+   else if(hasSellActive)
    {
-      Alert("✅ Sinal SELL atualizado com sucesso!");
+      Alert("✅ Sinal de VENDA atualizado com sucesso!\n\n",
+            "ID: ", StringSubstr(SellSignalId, 0, 8), "...");
+      Print("✅ Sinal SELL atualizado com sucesso!");
    }
 }
 
@@ -846,7 +916,7 @@ void OnUpdateButtonClick()
 //+------------------------------------------------------------------+
 void CreateResetButton()
 {
-   int x = 330; // Ao lado do botão de atualização
+   int x = 490; // Ao lado do botão de atualização
    int y = 30;
    int width = 120;
    int height = 30;
@@ -1027,9 +1097,9 @@ void EncerrarSignal(string signalId)
 }
 
 //+------------------------------------------------------------------+
-//| Manipulador de clique no botão de envio                         |
+//| Manipulador de clique no botão de COMPRA                        |
 //+------------------------------------------------------------------+
-void OnSendButtonClick()
+void OnBuyButtonClick()
 {
    if(!EAEnabled)
    {
@@ -1037,20 +1107,20 @@ void OnSendButtonClick()
       Print("❌ Tentativa de envio bloqueada. EA não habilitado.");
       return;
    }
-   
-   Print("📤 Enviando sinais BUY e SELL...");
-   
+
+   Print("📤 Enviando sinal BUY...");
+
    // ========== ENVIAR SINAL BUY ==========
    double buyEntry = ObjectGetDouble(0, BuyEntryLine, OBJPROP_PRICE);
    double buyStopLoss = ObjectGetDouble(0, BuyStopLossLine, OBJPROP_PRICE);
    double buyTake1 = ObjectGetDouble(0, BuyTake1Line, OBJPROP_PRICE);
    double buyTake2 = ObjectGetDouble(0, BuyTake2Line, OBJPROP_PRICE);
    double buyTake3 = ObjectGetDouble(0, BuyTake3Line, OBJPROP_PRICE);
-   
+
    // Calcular stopTicks para BUY
    double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
    int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
-   
+
    if(tickSize <= 0)
    {
       double pointValue = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
@@ -1059,90 +1129,106 @@ void OnSendButtonClick()
       else
          tickSize = pointValue;
    }
-   
+
    double buyPriceDiff = MathAbs(buyEntry - buyStopLoss);
    int buyStopTicks = (int)MathRound(buyPriceDiff / tickSize);
    if(buyStopTicks <= 0)
       buyStopTicks = 1;
-   
+
    // Resetar flags de monitoramento BUY ao enviar novo sinal
-   BuyEntryHit = false; // CRÍTICO: Resetar para permitir monitoramento de entrada após envio
+   BuyEntryHit = false;
    BuyStopHit = false;
    BuyTake1Hit = false;
    BuyTake2Hit = false;
    BuyTake3Hit = false;
-   
+
    string buyId = SendSignal("BUY", buyEntry, buyStopLoss, buyTake1, buyTake2, buyTake3, buyStopTicks);
    bool buySuccess = (buyId != "");
+
    if(buySuccess)
    {
-      BuySignalId = buyId; // Definir ID do sinal enviado - AGORA pode monitorar EM_OPERACAO
-      Print("✅ Sinal BUY enviado! ID: ", buyId, " | Agora monitorando entrada para EM_OPERACAO...");
+      BuySignalId = buyId;
+      Comment("");
+      Alert("✅ Sinal de COMPRA enviado com sucesso!\n\nEntry: ", DoubleToString(buyEntry, _Digits),
+            "\nStop: ", DoubleToString(buyStopLoss, _Digits),
+            "\nTake1: ", DoubleToString(buyTake1, _Digits));
+      Print("✅ Sinal BUY enviado! ID: ", buyId, " | Monitorando entrada...");
    }
    else
    {
-      BuySignalId = ""; // Garantir que está vazio se falhou
-      Print("❌ Falha ao enviar sinal BUY. Monitoramento não será ativado.");
+      BuySignalId = "";
+      Alert("❌ Falha ao enviar sinal de COMPRA.\nVerifique sua conexão e tente novamente.");
+      Print("❌ Falha ao enviar sinal BUY.");
    }
-   
+}
+
+//+------------------------------------------------------------------+
+//| Manipulador de clique no botão de VENDA                         |
+//+------------------------------------------------------------------+
+void OnSellButtonClick()
+{
+   if(!EAEnabled)
+   {
+      Alert("❌ EA não está habilitado. Verifique a autorização da conta e validade da licença.");
+      Print("❌ Tentativa de envio bloqueada. EA não habilitado.");
+      return;
+   }
+
+   Print("📤 Enviando sinal SELL...");
+
    // ========== ENVIAR SINAL SELL ==========
    double sellEntry = ObjectGetDouble(0, SellEntryLine, OBJPROP_PRICE);
    double sellStopLoss = ObjectGetDouble(0, SellStopLossLine, OBJPROP_PRICE);
    double sellTake1 = ObjectGetDouble(0, SellTake1Line, OBJPROP_PRICE);
    double sellTake2 = ObjectGetDouble(0, SellTake2Line, OBJPROP_PRICE);
    double sellTake3 = ObjectGetDouble(0, SellTake3Line, OBJPROP_PRICE);
-   
+
    // Calcular stopTicks para SELL
+   double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+   int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+
+   if(tickSize <= 0)
+   {
+      double pointValue = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+      if(digits == 3 || digits == 5)
+         tickSize = pointValue * 10;
+      else
+         tickSize = pointValue;
+   }
+
    double sellPriceDiff = MathAbs(sellEntry - sellStopLoss);
    int sellStopTicks = (int)MathRound(sellPriceDiff / tickSize);
    if(sellStopTicks <= 0)
       sellStopTicks = 1;
-   
+
    // Resetar flags de monitoramento SELL ao enviar novo sinal
-   SellEntryHit = false; // CRÍTICO: Resetar para permitir monitoramento de entrada após envio
+   SellEntryHit = false;
    SellStopHit = false;
    SellTake1Hit = false;
    SellTake2Hit = false;
    SellTake3Hit = false;
-   
+
    string sellId = SendSignal("SELL", sellEntry, sellStopLoss, sellTake1, sellTake2, sellTake3, sellStopTicks);
    bool sellSuccess = (sellId != "");
+
    if(sellSuccess)
    {
-      SellSignalId = sellId; // Definir ID do sinal enviado - AGORA pode monitorar EM_OPERACAO
-      Print("✅ Sinal SELL enviado! ID: ", sellId, " | Agora monitorando entrada para EM_OPERACAO...");
+      SellSignalId = sellId;
+      Comment("");
+      Alert("✅ Sinal de VENDA enviado com sucesso!\n\nEntry: ", DoubleToString(sellEntry, _Digits),
+            "\nStop: ", DoubleToString(sellStopLoss, _Digits),
+            "\nTake1: ", DoubleToString(sellTake1, _Digits));
+      Print("✅ Sinal SELL enviado! ID: ", sellId, " | Monitorando entrada...");
    }
    else
    {
-      SellSignalId = ""; // Garantir que está vazio se falhou
-      Print("❌ Falha ao enviar sinal SELL. Monitoramento não será ativado.");
-   }
-   
-   // ========== RESULTADO ==========
-   // Limpar mensagem de erro do gráfico se houver
-   Comment("");
-   
-   if(buySuccess && sellSuccess)
-   {
-      Alert("✅ Ambos os sinais enviados com sucesso!\n\nBUY: ✅\nSELL: ✅");
-      Print("✅ Sinais BUY e SELL enviados com sucesso!");
-   }
-   else if(buySuccess && !sellSuccess)
-   {
-      Alert("⚠️ Sinal BUY enviado ✅\nSinal SELL falhou ❌");
-      Print("✅ BUY enviado | ❌ SELL falhou");
-   }
-   else if(!buySuccess && sellSuccess)
-   {
-      Alert("⚠️ Sinal BUY falhou ❌\nSinal SELL enviado ✅");
-      Print("❌ BUY falhou | ✅ SELL enviado");
-   }
-   else
-   {
-      Alert("❌ Erro ao enviar ambos os sinais.\n\nBUY: ❌\nSELL: ❌\n\nVerifique os logs.");
-      Print("❌ Erro ao enviar sinais BUY e SELL");
+      SellSignalId = "";
+      Alert("❌ Falha ao enviar sinal de VENDA.\nVerifique sua conexão e tente novamente.");
+      Print("❌ Falha ao enviar sinal SELL.");
    }
 }
+
+// Função OnSendButtonClick removida - substituída por OnBuyButtonClick e OnSellButtonClick
 
 //+------------------------------------------------------------------+
 //| Enviar sinal BUY quando preço atingir a linha                   |
@@ -1879,22 +1965,22 @@ void UpdateSignalFromLines()
 {
    if(!EAEnabled)
       return;
-   
-   // Atualizar sinal BUY se existir
-   if(BuySignalId != "")
+
+   // Atualizar sinal BUY se existir E ainda estiver ativo (não atingiu nenhum take ou stop)
+   if(BuySignalId != "" && !BuyTake1Hit && !BuyTake2Hit && !BuyTake3Hit && !BuyStopHit)
    {
       double entry = ObjectGetDouble(0, BuyEntryLine, OBJPROP_PRICE);
       double stopLoss = ObjectGetDouble(0, BuyStopLossLine, OBJPROP_PRICE);
       double take1 = ObjectGetDouble(0, BuyTake1Line, OBJPROP_PRICE);
       double take2 = ObjectGetDouble(0, BuyTake2Line, OBJPROP_PRICE);
       double take3 = ObjectGetDouble(0, BuyTake3Line, OBJPROP_PRICE);
-      
+
       if(entry > 0 && stopLoss > 0 && take1 > 0 && take2 > 0 && take3 > 0)
       {
          // Calcular stopTicks
          double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
          int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
-         
+
          if(tickSize <= 0)
          {
             double pointValue = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
@@ -1903,28 +1989,40 @@ void UpdateSignalFromLines()
             else
                tickSize = pointValue;
          }
-         
+
          int stopTicks = (int)MathRound(MathAbs(entry - stopLoss) / tickSize);
-         
+
+         Print("📤 Enviando atualização do sinal BUY (ID: ", StringSubstr(BuySignalId, 0, 8), "...)");
          UpdateSignalData(BuySignalId, entry, stopLoss, take1, take2, take3, stopTicks);
       }
    }
-   
-   // Atualizar sinal SELL se existir
-   if(SellSignalId != "")
+   else if(BuySignalId != "")
+   {
+      if(BuyTake1Hit)
+         Print("⚠️ Sinal BUY já atingiu Take 1. Não pode mais ser atualizado.");
+      else if(BuyTake2Hit)
+         Print("⚠️ Sinal BUY já atingiu Take 2. Não pode mais ser atualizado.");
+      else if(BuyTake3Hit)
+         Print("⚠️ Sinal BUY já atingiu Take 3. Não pode mais ser atualizado.");
+      else if(BuyStopHit)
+         Print("⚠️ Sinal BUY já atingiu Stop Loss. Não pode mais ser atualizado.");
+   }
+
+   // Atualizar sinal SELL se existir E ainda estiver ativo (não atingiu nenhum take ou stop)
+   if(SellSignalId != "" && !SellTake1Hit && !SellTake2Hit && !SellTake3Hit && !SellStopHit)
    {
       double entry = ObjectGetDouble(0, SellEntryLine, OBJPROP_PRICE);
       double stopLoss = ObjectGetDouble(0, SellStopLossLine, OBJPROP_PRICE);
       double take1 = ObjectGetDouble(0, SellTake1Line, OBJPROP_PRICE);
       double take2 = ObjectGetDouble(0, SellTake2Line, OBJPROP_PRICE);
       double take3 = ObjectGetDouble(0, SellTake3Line, OBJPROP_PRICE);
-      
+
       if(entry > 0 && stopLoss > 0 && take1 > 0 && take2 > 0 && take3 > 0)
       {
          // Calcular stopTicks
          double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
          int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
-         
+
          if(tickSize <= 0)
          {
             double pointValue = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
@@ -1933,11 +2031,23 @@ void UpdateSignalFromLines()
             else
                tickSize = pointValue;
          }
-         
+
          int stopTicks = (int)MathRound(MathAbs(entry - stopLoss) / tickSize);
-         
+
+         Print("📤 Enviando atualização do sinal SELL (ID: ", StringSubstr(SellSignalId, 0, 8), "...)");
          UpdateSignalData(SellSignalId, entry, stopLoss, take1, take2, take3, stopTicks);
       }
+   }
+   else if(SellSignalId != "")
+   {
+      if(SellTake1Hit)
+         Print("⚠️ Sinal SELL já atingiu Take 1. Não pode mais ser atualizado.");
+      else if(SellTake2Hit)
+         Print("⚠️ Sinal SELL já atingiu Take 2. Não pode mais ser atualizado.");
+      else if(SellTake3Hit)
+         Print("⚠️ Sinal SELL já atingiu Take 3. Não pode mais ser atualizado.");
+      else if(SellStopHit)
+         Print("⚠️ Sinal SELL já atingiu Stop Loss. Não pode mais ser atualizado.");
    }
 }
 

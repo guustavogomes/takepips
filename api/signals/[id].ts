@@ -131,23 +131,30 @@ export default async function handler(
     console.log('[SIGNAL] Sinal atualizado, enviando notificação push...', {
       id: updatedSignal.id,
       type: updatedSignal.type,
-      symbol: updatedSignal.symbol
+      symbol: updatedSignal.symbol,
+      changedFields: changedFields
     });
-    
-    notifySignalDataUpdate(
-      updatedSignal.type,
-      updatedSignal.symbol,
-      updatedSignal.entry,
-      updatedSignal.stopLoss,
-      updatedSignal.take1
-    )
-      .then(() => {
-        console.log('[PUSH] ✅ Notificação de atualização de sinal enviada com sucesso');
-      })
-      .catch(error => {
-        console.error('[PUSH] ❌ Erro ao enviar notificação de atualização:', error);
-        console.error('[PUSH] Stack:', error instanceof Error ? error.stack : 'N/A');
-      });
+
+    // Só enviar notificação se realmente houve mudanças
+    if (changedFields.length > 0) {
+      notifySignalDataUpdate(
+        updatedSignal.type,
+        updatedSignal.symbol,
+        updatedSignal.entry,
+        updatedSignal.stopLoss,
+        updatedSignal.take1,
+        changedFields
+      )
+        .then(() => {
+          console.log('[PUSH] ✅ Notificação de atualização de sinal enviada com sucesso');
+        })
+        .catch(error => {
+          console.error('[PUSH] ❌ Erro ao enviar notificação de atualização:', error);
+          console.error('[PUSH] Stack:', error instanceof Error ? error.stack : 'N/A');
+        });
+    } else {
+      console.log('[PUSH] ℹ️ Nenhum campo foi realmente alterado, notificação não enviada');
+    }
 
     res.status(200).json({
       success: true,

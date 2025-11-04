@@ -297,13 +297,35 @@ export async function notifySignalDataUpdate(
   symbol: string,
   entry: number,
   stopLoss: number,
-  take1: number
+  take1: number,
+  changedFields?: string[]
 ): Promise<void> {
-  console.log('[PUSH] notifySignalDataUpdate chamado:', { signalType, symbol, entry, stopLoss, take1 });
-  
+  console.log('[PUSH] notifySignalDataUpdate chamado:', { signalType, symbol, entry, stopLoss, take1, changedFields });
+
   const emoji = signalType === 'BUY' ? '📈' : '📉';
   const title = `🔄 ${emoji} Sinal ${signalType} Atualizado - ${symbol}`;
-  const body = `Entry: ${entry.toFixed(2)} | Stop: ${stopLoss.toFixed(2)} | Take1: ${take1.toFixed(2)}`;
+
+  // Montar mensagem mostrando o que foi alterado
+  let body = '';
+
+  if (changedFields && changedFields.length > 0) {
+    // Traduzir nomes dos campos
+    const fieldNames: Record<string, string> = {
+      entry: 'Entrada',
+      stopLoss: 'Stop Loss',
+      take1: 'Take 1',
+      take2: 'Take 2',
+      take3: 'Take 3',
+      stopTicks: 'Stop Ticks',
+    };
+
+    // Montar lista de campos alterados
+    const changedFieldsText = changedFields.map(field => fieldNames[field] || field).join(', ');
+    body = `Alterado: ${changedFieldsText}\nEntry: ${entry.toFixed(2)} | Stop: ${stopLoss.toFixed(2)} | Take1: ${take1.toFixed(2)}`;
+  } else {
+    // Fallback se não tiver changedFields
+    body = `Entry: ${entry.toFixed(2)} | Stop: ${stopLoss.toFixed(2)} | Take1: ${take1.toFixed(2)}`;
+  }
 
   console.log('[PUSH] Preparando notificação de atualização:', { title, body });
 
@@ -313,10 +335,11 @@ export async function notifySignalDataUpdate(
     entry,
     stopLoss,
     take1,
+    changedFields: changedFields || [],
     event: 'SIGNAL_DATA_UPDATE',
     timestamp: new Date().toISOString(),
   });
-  
+
   console.log('[PUSH] notifySignalDataUpdate concluído');
 }
 

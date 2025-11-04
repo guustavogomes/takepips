@@ -5,13 +5,14 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import Toast from 'react-native-toast-message';
 import { usePushNotifications } from '@/presentation/hooks/usePushNotifications';
+import { supabase } from '@/infrastructure/services/supabaseClient';
 
 // Previne que a splash screen esconda automaticamente
 SplashScreen.preventAutoHideAsync();
@@ -27,9 +28,26 @@ const queryClient = new QueryClient({
 
 function RootLayoutContent() {
   const [appIsReady, setAppIsReady] = useState(false);
+  const router = useRouter();
 
   // Registrar push notifications automaticamente
   usePushNotifications();
+
+  // Listener para mudanças de autenticação
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[RootLayout] Auth state changed:', event);
+
+      if (event === 'SIGNED_OUT') {
+        // Redirecionar para login quando fizer logout
+        router.replace('/(auth)/login');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     async function prepare() {

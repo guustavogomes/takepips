@@ -4,7 +4,7 @@
  * Gerenciamento de perfil, estatísticas e configurações
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -13,13 +13,16 @@ import {
   TouchableOpacity,
   Alert,
   Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { supabase } from '@/infrastructure/services/supabaseClient';
+import { showSuccess, showError } from '@/shared/utils/toast';
 
 export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = () => {
     Alert.alert(
@@ -27,7 +30,23 @@ export default function ProfileScreen() {
       'Tem certeza que deseja sair da sua conta?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Sair', style: 'destructive', onPress: () => console.log('Logout') },
+        {
+          text: 'Sair',
+          style: 'destructive',
+          onPress: async () => {
+            setIsLoggingOut(true);
+            try {
+              await supabase.auth.signOut();
+              showSuccess('Logout realizado com sucesso!');
+              // O listener no _layout.tsx vai redirecionar automaticamente
+            } catch (error) {
+              console.error('[Profile] Erro ao fazer logout:', error);
+              showError('Erro ao sair. Tente novamente.');
+            } finally {
+              setIsLoggingOut(false);
+            }
+          },
+        },
       ]
     );
   };
@@ -195,9 +214,19 @@ export default function ProfileScreen() {
       </View>
 
       {/* Botão de Logout */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Ionicons name="log-out-outline" size={22} color="#ef4444" />
-        <Text style={styles.logoutButtonText}>Sair da Conta</Text>
+      <TouchableOpacity
+        style={[styles.logoutButton, isLoggingOut && styles.logoutButtonDisabled]}
+        onPress={handleLogout}
+        disabled={isLoggingOut}
+      >
+        {isLoggingOut ? (
+          <ActivityIndicator size="small" color="#ef4444" />
+        ) : (
+          <Ionicons name="log-out-outline" size={22} color="#ef4444" />
+        )}
+        <Text style={styles.logoutButtonText}>
+          {isLoggingOut ? 'Saindo...' : 'Sair da Conta'}
+        </Text>
       </TouchableOpacity>
 
       {/* Footer */}
@@ -360,6 +389,9 @@ const styles = StyleSheet.create({
     gap: 8,
     borderWidth: 1,
     borderColor: '#ef4444' + '30',
+  },
+  logoutButtonDisabled: {
+    opacity: 0.5,
   },
   logoutButtonText: {
     fontSize: 16,
