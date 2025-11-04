@@ -1,9 +1,12 @@
 /**
- * Tabs Layout - Layout principal com abas
+ * Tabs Layout - Menu Sofisticado TakePips
+ *
+ * 5 Tabs: Home | Educação | Sinais (Centro) | Ferramentas | Perfil
  */
 
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+import { Platform } from 'react-native';
 
 export default function TabsLayout() {
   return (
@@ -11,28 +14,130 @@ export default function TabsLayout() {
       screenOptions={{
         headerStyle: {
           backgroundColor: '#0A0E27',
+          borderBottomWidth: 1,
+          borderBottomColor: '#FFD700',
         },
-        headerTintColor: '#FFFFFF',
+        headerTintColor: '#FFD700',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+          fontSize: 18,
+        },
         tabBarStyle: {
-          backgroundColor: '#1A1F3A',
-          borderTopColor: '#2A2F4A',
+          backgroundColor: '#0f1419',
+          borderTopWidth: 1,
+          borderTopColor: '#1a1f2e',
+          height: Platform.OS === 'ios' ? 88 : 65,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+          paddingTop: 8,
+          elevation: 20,
+          shadowColor: '#FFD700',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
         },
-        tabBarActiveTintColor: '#4A90E2',
-        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarActiveTintColor: '#FFD700',
+        tabBarInactiveTintColor: '#6B7280',
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+          marginTop: 2,
+        },
       }}
     >
+      {/* Home - Vídeos do YouTube */}
+      <Tabs.Screen
+        name="home"
+        options={{
+          title: 'Home',
+          headerTitle: '🏠 TakePips',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? 'home' : 'home-outline'}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      {/* Educação - E-books */}
+      <Tabs.Screen
+        name="education"
+        options={{
+          title: 'Educação',
+          headerTitle: '📚 Aprenda Forex',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? 'book' : 'book-outline'}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      {/* Sinais - Centro (Principal) */}
       <Tabs.Screen
         name="index"
         options={{
           title: 'Sinais',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>📊</Text>,
+          headerTitle: '📊 Sinais GOLD',
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialCommunityIcons
+              name={focused ? 'finance' : 'chart-line'}
+              size={28}
+              color={color}
+            />
+          ),
+          tabBarIconStyle: {
+            marginTop: -5,
+          },
+          tabBarLabelStyle: {
+            fontSize: 12,
+            fontWeight: 'bold',
+            marginTop: 0,
+          },
         }}
       />
+
+      {/* Ferramentas */}
+      <Tabs.Screen
+        name="tools"
+        options={{
+          title: 'Ferramentas',
+          headerTitle: '🛠️ Ferramentas',
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialCommunityIcons
+              name={focused ? 'toolbox' : 'toolbox-outline'}
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      {/* Perfil */}
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Perfil',
+          headerTitle: '👤 Meu Perfil',
+          tabBarIcon: ({ color, focused }) => (
+            <FontAwesome5
+              name="user-circle"
+              size={22}
+              color={color}
+              solid={focused}
+            />
+          ),
+        }}
+      />
+
+      {/* Remover settings antiga */}
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Configurações',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>⚙️</Text>,
+          href: null, // Esconde da navegação
         }}
       />
     </Tabs>

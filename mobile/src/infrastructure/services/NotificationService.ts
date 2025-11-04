@@ -49,9 +49,13 @@ export class NotificationService {
 
   /**
    * Obtém o token Expo Push
+   *
+   * NOTA: Em desenvolvimento com Expo Go, push notifications remotas não funcionam.
+   * Requer EAS Build ou development build para funcionar completamente.
    */
   async getExpoPushToken(): Promise<string | null> {
     if (!Device.isDevice) {
+      console.log('[NotificationService] Simulador/emulador detectado - push notifications desabilitadas');
       return null;
     }
 
@@ -61,18 +65,27 @@ export class NotificationService {
     }
 
     try {
-      // No Expo Go, notificações push não funcionam completamente
-      // Tentar obter token, mas silenciosamente ignorar erros de projectId
-      const tokenData = await Notifications.getExpoPushTokenAsync();
+      // Verificar se estamos em um ambiente que suporta push tokens
+      // No Expo Go, isso vai falhar sem projectId do EAS
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: undefined, // Usar undefined explicitamente para desenvolvimento
+      });
 
+      console.log('[NotificationService] Push token obtido com sucesso');
       return tokenData.data;
     } catch (error: any) {
-      // Ignorar erros de projectId no Expo Go (esperado)
-      if (error?.message?.includes('projectId')) {
-        console.warn('[NotificationService] Expo Go não suporta push notifications completamente. Use development build para notificações.');
+      // Erros esperados em desenvolvimento
+      const errorMessage = error?.message || '';
+
+      if (errorMessage.includes('projectId') || errorMessage.includes('experienceId')) {
+        // Isso é normal no Expo Go - não é um erro crítico
+        console.log('[NotificationService] Modo desenvolvimento: Push notifications remotas não disponíveis.');
+        console.log('[NotificationService] Para habilitar: configure EAS Build ou use notificações locais.');
         return null;
       }
-      console.error('[NotificationService] Error getting push token:', error);
+
+      // Outros erros são inesperados
+      console.error('[NotificationService] Erro ao obter push token:', error);
       return null;
     }
   }

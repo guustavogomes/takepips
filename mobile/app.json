@@ -28,8 +28,10 @@
       },
       "package": "com.takepips.mobile",
       "permissions": [
-        "RECEIVE_BOOT_COMPLETED"
-      ]
+        "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS"
+      ],
+      "useNextNotificationsApi": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -39,7 +41,10 @@
       [
         "expo-notifications",
         {
-          "color": "#4A90E2"
+          "icon": "./assets/icon.png",
+          "color": "#FFD700",
+          "sounds": [],
+          "mode": "development"
         }
       ]
     ],
