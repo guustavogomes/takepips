@@ -71,8 +71,9 @@ export default function SplashScreenComponent() {
   }, []);
 
   useEffect(() => {
-    // Aguardar verificação de autenticação e mínimo 2 segundos de splash
-    const minSplashTime = 2000;
+    // Aguardar verificação de autenticação e mínimo 3.5 segundos de splash
+    // Para que o usuário possa ver a animação bonita
+    const minSplashTime = 3500;
     const startTime = Date.now();
 
     const checkAuth = async () => {

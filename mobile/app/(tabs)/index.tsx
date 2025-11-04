@@ -17,6 +17,7 @@ import { SignalCard } from '@/presentation/components/SignalCard';
 import { LoadingSpinner } from '@/presentation/components/LoadingSpinner';
 import { ErrorView } from '@/presentation/components/ErrorView';
 import { Signal } from '@/domain/models/Signal';
+import { showSuccess } from '@/shared/utils/toast';
 
 export default function HomeScreen() {
   const [page, setPage] = useState(1);
@@ -25,6 +26,7 @@ export default function HomeScreen() {
 
   const handleRefresh = () => {
     refetch();
+    showSuccess('Lista atualizada!');
   };
 
   const handleSignalPress = (signal: Signal) => {

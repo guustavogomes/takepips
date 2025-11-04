@@ -41,20 +41,12 @@ export class AuthRepositorySupabase implements IAuthRepository {
         throw new Error('Usuário criado mas dados não retornados');
       }
 
-      // Se não houver sessão (email não confirmado), fazer login
-      let session = authData.session;
-      if (!session) {
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email: data.email,
-          password: data.password,
-        });
-
-        if (signInError || !signInData.session) {
-          // Usuário criado mas precisa confirmar email
-          throw new Error('Usuário criado. Verifique seu email para confirmar a conta.');
-        }
-
-        session = signInData.session;
+      // Se não houver sessão, significa que o email precisa ser confirmado
+      // No Supabase, quando email confirmation está habilitado, signUp não retorna sessão
+      if (!authData.session) {
+        // Verificar se o email foi confirmado (pode ser que já esteja confirmado em alguns casos)
+        // Se não houver sessão, o usuário precisa confirmar o email primeiro
+        throw new Error('EMAIL_CONFIRMATION_REQUIRED: Usuário criado com sucesso! Verifique seu email para confirmar a conta antes de fazer login.');
       }
 
       const authResponse: AuthResponse = {
@@ -65,8 +57,8 @@ export class AuthRepositorySupabase implements IAuthRepository {
           createdAt: new Date(authData.user.created_at),
           updatedAt: new Date(authData.user.updated_at || authData.user.created_at),
         },
-        token: session.access_token,
-        refreshToken: session.refresh_token,
+        token: authData.session.access_token,
+        refreshToken: authData.session.refresh_token,
       };
 
       return authResponse;
@@ -84,8 +76,27 @@ export class AuthRepositorySupabase implements IAuthRepository {
         password: data.password,
       });
 
-      if (authError || !authData.user || !authData.session) {
+      if (authError) {
         console.error('[AuthRepositorySupabase] Erro ao fazer login:', authError);
+        
+        // Tratar erros específicos do Supabase
+        // Verificar se é erro de email não confirmado
+        if (authError.message.includes('Email not confirmed') || 
+            (authError.message.includes('Invalid login credentials') && 
+             authError.message.toLowerCase().includes('confirm'))) {
+          throw new Error('EMAIL_NOT_CONFIRMED: Email não confirmado. Verifique sua caixa de entrada e confirme sua conta antes de fazer login.');
+        }
+        
+        // Erro de credenciais inválidas
+        if (authError.message.includes('Invalid login credentials')) {
+          throw new Error('Email ou senha incorretos');
+        }
+        
+        throw new Error(authError.message || 'Erro ao fazer login');
+      }
+
+      if (!authData.user || !authData.session) {
+        console.error('[AuthRepositorySupabase] Erro: usuário ou sessão não retornados');
         throw new Error('Email ou senha incorretos');
       }
 

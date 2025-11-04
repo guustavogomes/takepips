@@ -17,6 +17,7 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRegister } from '@/presentation/hooks/useAuth';
+import { showError, showSuccess, showInfo } from '@/shared/utils/toast';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -40,8 +41,7 @@ export default function RegisterScreen() {
   const handleRegister = () => {
     const error = validateForm();
     if (error) {
-      // TODO: Mostrar toast de erro
-      console.error('Validation error:', error);
+      showError(error);
       return;
     }
 
@@ -53,11 +53,23 @@ export default function RegisterScreen() {
       },
       {
         onSuccess: () => {
+          showSuccess('Conta criada com sucesso!');
           router.replace('/(tabs)');
         },
         onError: (error) => {
           console.error('Register error:', error);
-          // TODO: Mostrar toast de erro
+          
+          // Verificar se é erro de confirmação de email
+          if (error.message?.includes('EMAIL_CONFIRMATION_REQUIRED')) {
+            const message = error.message.replace('EMAIL_CONFIRMATION_REQUIRED: ', '');
+            showInfo(message, 'Verifique seu email');
+            // Redirecionar para login após 2 segundos
+            setTimeout(() => {
+              router.replace('/(auth)/login');
+            }, 2000);
+          } else {
+            showError(error.message || 'Erro ao criar conta. Tente novamente.');
+          }
         },
       }
     );

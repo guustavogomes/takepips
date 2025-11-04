@@ -17,6 +17,7 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLogin } from '@/presentation/hooks/useAuth';
+import { showError, showSuccess } from '@/shared/utils/toast';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function LoginScreen() {
 
   const handleLogin = () => {
     if (!email.trim() || !password.trim()) {
+      showError('Preencha todos os campos');
       return;
     }
 
@@ -34,11 +36,19 @@ export default function LoginScreen() {
       { email: email.trim(), password },
       {
         onSuccess: () => {
+          showSuccess('Login realizado com sucesso!');
           router.replace('/(tabs)');
         },
         onError: (error) => {
           console.error('Login error:', error);
-          // TODO: Mostrar toast de erro
+          
+          // Verificar se é erro de email não confirmado
+          if (error.message?.includes('EMAIL_NOT_CONFIRMED')) {
+            const message = error.message.replace('EMAIL_NOT_CONFIRMED: ', '');
+            showError(message, 'Email não confirmado');
+          } else {
+            showError(error.message || 'Erro ao fazer login. Verifique suas credenciais.');
+          }
         },
       }
     );

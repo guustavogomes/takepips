@@ -19,6 +19,7 @@ import { LoadingSpinner } from '@/presentation/components/LoadingSpinner';
 import { ErrorView } from '@/presentation/components/ErrorView';
 import { NotificationPreferences } from '@/domain/models/NotificationPreferences';
 import { authRepository } from '@/shared/config/dependencies';
+import { showSuccess, showError } from '@/shared/utils/toast';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -43,12 +44,24 @@ export default function SettingsScreen() {
       updated.stopLoss = false;
     }
 
-    saveMutation.mutate(updated);
+    saveMutation.mutate(updated, {
+      onSuccess: () => {
+        showSuccess('Preferências salvas com sucesso!');
+      },
+      onError: (error) => {
+        showError('Erro ao salvar preferências. Tente novamente.');
+      },
+    });
   };
 
   const handleLogout = async () => {
-    await authRepository.logout();
-    router.replace('/(auth)/splash');
+    try {
+      await authRepository.logout();
+      showSuccess('Logout realizado com sucesso!');
+      router.replace('/(auth)/splash');
+    } catch (error) {
+      showError('Erro ao fazer logout. Tente novamente.');
+    }
   };
 
   if (isLoading) {
