@@ -3,13 +3,14 @@ import { Signal, CreateSignalData, SignalStatus } from '../../domain/entities/Si
 import { dbConnection } from '../database/connection';
 import { parseMT5DateTime } from '../../shared/utils/dateUtils';
 import { generateUUID } from '../../shared/utils/uuid';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Implementação do repositório de sinais usando Supabase
  * Migrado de Neon para Supabase
  */
 export class SignalRepositorySupabase implements ISignalRepository {
-  private readonly supabase = dbConnection.getConnection();
+  private readonly supabase = dbConnection.getConnection() as unknown as SupabaseClient<any>;
 
   async create(data: CreateSignalData): Promise<Signal> {
     const id = generateUUID();
@@ -35,7 +36,7 @@ export class SignalRepositorySupabase implements ISignalRepository {
 
     const { data: result, error } = await this.supabase
       .from('signals')
-      .insert(signalData)
+      .insert(signalData as any)
       .select()
       .single();
 
@@ -115,7 +116,7 @@ export class SignalRepositorySupabase implements ISignalRepository {
 
     const { data, error } = await this.supabase
       .from('signals')
-      .update(updateData)
+      .update(updateData as any)
       .eq('id', id)
       .select()
       .single();
@@ -157,7 +158,7 @@ export class SignalRepositorySupabase implements ISignalRepository {
 
     const { data: result, error } = await this.supabase
       .from('signals')
-      .update(updateData)
+      .update(updateData as any)
       .eq('id', id)
       .select()
       .single();
