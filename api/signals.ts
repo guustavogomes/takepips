@@ -40,13 +40,13 @@ export default async function handler(
       return;
     }
 
-    // Verificar variáveis de ambiente antes de inicializar dependências
-    if (!process.env.DATABASE_URL) {
-      console.error('[ERROR] DATABASE_URL não está configurada');
+    // Verificar se Supabase está configurado
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('[ERROR] Supabase não está configurado');
       res.status(500).json({
         success: false,
         error: {
-          message: 'Configuração do servidor incompleta. Contate o administrador.',
+          message: 'Configuração do servidor incompleta. Supabase não configurado.',
           code: 'CONFIGURATION_ERROR',
         },
       });

@@ -15,12 +15,20 @@ if (process.env.NODE_ENV !== 'production') {
 
 /**
  * Valida se as variáveis de ambiente necessárias estão configuradas
+ * Migrado para Supabase - agora valida variáveis do Supabase
  */
 export function validateEnv(): void {
-  if (!process.env.DATABASE_URL) {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
     throw new Error(
-      'DATABASE_URL não está configurada. ' +
-      'Crie um arquivo .env na raiz do projeto com DATABASE_URL=sua_connection_string'
+      'NEXT_PUBLIC_SUPABASE_URL não está configurada. ' +
+      'Configure NEXT_PUBLIC_SUPABASE_URL nas variáveis de ambiente'
+    );
+  }
+  
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error(
+      'SUPABASE_SERVICE_ROLE_KEY não está configurada. ' +
+      'Configure SUPABASE_SERVICE_ROLE_KEY nas variáveis de ambiente'
     );
   }
 }
