@@ -1,6 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { SignalRepository } from '../../../src/infrastructure/repositories/SignalRepository';
-import { neon } from '@neondatabase/serverless';
+import { SignalRepositorySupabase } from '../../../src/infrastructure/repositories/SignalRepositorySupabase';
 
 /**
  * API Route para encerrar um sinal (parar monitoramento)
@@ -58,7 +57,7 @@ export default async function handler(
       return;
     }
 
-    const signalRepository = new SignalRepository();
+    const signalRepository = new SignalRepositorySupabase();
     
     // Verificar se o sinal existe
     const signal = await signalRepository.findById(id);

@@ -2,9 +2,9 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * API Route para registrar subscription de push notifications
+ * API Route para remover subscription de push notifications
  * 
- * Endpoint: POST /api/push/subscribe
+ * Endpoint: POST /api/push/unsubscribe
  */
 export default async function handler(
   req: VercelRequest,
@@ -44,8 +44,7 @@ export default async function handler(
       return;
     }
 
-    // Suporta tanto Web Push (subscription) quanto Expo Push (token)
-    const { subscription, token, platform, deviceId } = req.body;
+    const { token, endpoint } = req.body;
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -58,80 +57,60 @@ export default async function handler(
       }
     );
 
-    // Se for token Expo (React Native)
+    // Se for token Expo
     if (token) {
-      // Inserir ou atualizar token Expo usando Supabase
-      const { error: upsertError } = await supabase
+      const { error } = await supabase
         .from('expo_push_tokens')
-        .upsert(
-          {
-            token,
-            platform: platform || 'unknown',
-            device_id: deviceId || 'unknown',
-            updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: 'token',
-          }
-        );
+        .delete()
+        .eq('token', token);
 
-      if (upsertError) {
-        console.error('[ERROR] Erro ao salvar token Expo:', upsertError);
-        throw upsertError;
+      if (error) {
+        console.error('[ERROR] Erro ao remover token:', error);
+        throw error;
       }
 
-      console.log('✅ Expo Push Token salvo:', token);
+      console.log('✅ Expo Push Token removido:', token);
       
       res.status(200).json({
         success: true,
-        message: 'Token registrado com sucesso',
+        message: 'Token removido com sucesso',
       });
       return;
     }
 
-    // Se for Web Push subscription (PWA)
-    if (!subscription || !subscription.endpoint || !subscription.keys) {
+    // Se for Web Push subscription
+    if (!endpoint) {
       res.status(400).json({
         success: false,
         error: {
-          message: 'Subscription ou token inválido. É necessário subscription (endpoint e keys) ou token (Expo).',
-          code: 'INVALID_SUBSCRIPTION',
+          message: 'Token ou endpoint é necessário.',
+          code: 'INVALID_REQUEST',
         },
       });
       return;
     }
 
-    // Inserir ou atualizar subscription usando Supabase
-    const { error: upsertError } = await supabase
+    const { error } = await supabase
       .from('push_subscriptions')
-      .upsert(
-        {
-          endpoint: subscription.endpoint,
-          p256dh: subscription.keys.p256dh,
-          auth: subscription.keys.auth,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: 'endpoint',
-        }
-      );
+      .delete()
+      .eq('endpoint', endpoint);
 
-    if (upsertError) {
-      console.error('[ERROR] Erro ao salvar subscription:', upsertError);
-      throw upsertError;
+    if (error) {
+      console.error('[ERROR] Erro ao remover subscription:', error);
+      throw error;
     }
 
-    console.log('✅ Subscription salva:', subscription.endpoint);
+    console.log('✅ Subscription removida:', endpoint);
 
     res.status(200).json({
       success: true,
-      message: 'Subscription registrada com sucesso',
+      message: 'Subscription removida com sucesso',
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
     const errorStack = error instanceof Error ? error.stack : undefined;
     
-    console.error('[ERROR] Erro ao registrar subscription:', {
+    console.error('[ERROR] Erro ao remover subscription:', {
       message: errorMessage,
       stack: errorStack,
       error: error,
@@ -146,4 +125,3 @@ export default async function handler(
     });
   }
 }
-

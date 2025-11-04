@@ -1,5 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { SignalRepository } from '../../src/infrastructure/repositories/SignalRepository';
+import { SignalRepositorySupabase } from '../../src/infrastructure/repositories/SignalRepositorySupabase';
 import { notifySignalDataUpdate } from '../../src/shared/utils/pushNotifications';
 
 /**
@@ -80,7 +80,7 @@ export default async function handler(
       return;
     }
 
-    const signalRepository = new SignalRepository();
+    const signalRepository = new SignalRepositorySupabase();
     
     // Buscar sinal antes de atualizar para obter dados completos
     const signalBefore = await signalRepository.findById(id);

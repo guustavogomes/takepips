@@ -4,10 +4,8 @@ import { validateEnv } from '../../shared/config/env';
 /**
  * Cria conexão com o banco de dados Supabase
  * Singleton pattern para reutilizar conexões
- * 
- * Migrado de Neon para Supabase
  */
-class DatabaseConnection {
+class SupabaseConnection {
   private supabase: ReturnType<typeof createClient> | null = null;
 
   /**
@@ -38,11 +36,13 @@ class DatabaseConnection {
   }
 
   /**
-   * Obtém o cliente SQL direto (compatibilidade com código existente)
-   * @returns Cliente Supabase
+   * Obtém o cliente SQL direto (para queries SQL puras)
+   * @returns Cliente SQL do Supabase
    */
   getSQLClient() {
-    return this.getConnection();
+    const client = this.getConnection();
+    // Retorna o cliente para queries SQL diretas
+    return client;
   }
 
   /**
@@ -53,5 +53,10 @@ class DatabaseConnection {
   }
 }
 
-export const dbConnection = new DatabaseConnection();
+export const supabaseConnection = new SupabaseConnection();
 
+// Para compatibilidade com código existente que usa `dbConnection`
+export const dbConnection = {
+  getConnection: () => supabaseConnection.getConnection(),
+  close: () => supabaseConnection.close(),
+};

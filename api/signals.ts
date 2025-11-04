@@ -1,7 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { SignalController } from '../src/presentation/controllers/SignalController';
 import { CreateSignalUseCase } from '../src/application/useCases/CreateSignalUseCase';
-import { SignalRepository } from '../src/infrastructure/repositories/SignalRepository';
+import { SignalRepositorySupabase } from '../src/infrastructure/repositories/SignalRepositorySupabase';
 
 /**
  * API Route para receber sinais de trading
@@ -54,7 +54,7 @@ export default async function handler(
     }
 
     // Dependency Injection - criar instâncias seguindo SOLID
-    const signalRepository = new SignalRepository();
+    const signalRepository = new SignalRepositorySupabase();
     const createSignalUseCase = new CreateSignalUseCase(signalRepository);
     const signalController = new SignalController(createSignalUseCase);
 

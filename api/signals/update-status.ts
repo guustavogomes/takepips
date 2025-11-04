@@ -1,5 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { SignalRepository } from '../../src/infrastructure/repositories/SignalRepository';
+import { SignalRepositorySupabase } from '../../src/infrastructure/repositories/SignalRepositorySupabase';
 import { SignalStatus } from '../../src/domain/entities/Signal';
 import { notifySignalUpdate, notifyEntryHit } from '../../src/shared/utils/pushNotifications';
 
@@ -107,7 +107,7 @@ export default async function handler(
     }
 
     // Atualizar status no banco
-    const signalRepository = new SignalRepository();
+    const signalRepository = new SignalRepositorySupabase();
     // Para EM_OPERACAO, usar hitPrice se fornecido, senão usar 0 (não será usado no repositório)
     const finalHitPrice = status === 'EM_OPERACAO' ? (hitPrice || 0) : hitPrice;
     const updatedSignal = await signalRepository.updateStatus(id, status, finalHitPrice);

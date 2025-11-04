@@ -1,5 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { SignalRepository } from '../../src/infrastructure/repositories/SignalRepository';
+import { SignalRepositorySupabase } from '../../src/infrastructure/repositories/SignalRepositorySupabase';
 
 /**
  * API Route para listar sinais
@@ -54,7 +54,7 @@ export default async function handler(
     const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
     const symbol = req.query.symbol as string | undefined;
 
-    const signalRepository = new SignalRepository();
+    const signalRepository = new SignalRepositorySupabase();
     
     // Buscar sinais
     let signals;

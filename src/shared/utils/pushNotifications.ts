@@ -1,5 +1,5 @@
 import webpush from 'web-push';
-import { neon } from '@neondatabase/serverless';
+import { createClient } from '@supabase/supabase-js';
 
 interface PushSubscription {
   endpoint: string;
@@ -66,80 +66,133 @@ export async function sendPushNotification(
   );
   console.log('[PUSH] ✅ VAPID configurado com sucesso');
 
-  if (!process.env.DATABASE_URL) {
-    console.error('[PUSH] DATABASE_URL não configurada');
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('[PUSH] Supabase não configurado');
     return;
   }
 
-  const sql = neon(process.env.DATABASE_URL);
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
 
   try {
-    // Garantir que a tabela existe
-    await sql`
-      CREATE TABLE IF NOT EXISTS push_subscriptions (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        endpoint TEXT UNIQUE NOT NULL,
-        p256dh TEXT NOT NULL,
-        auth TEXT NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
-      );
-    `.catch(err => {
-      console.warn('[PUSH] Tabela já existe ou erro ao criar:', err.message);
-    });
+    // Buscar todas as subscriptions (Web Push)
+    const { data: subscriptions, error: subscriptionsError } = await supabase
+      .from('push_subscriptions')
+      .select('endpoint, p256dh, auth');
 
-    // Buscar todas as subscriptions
-    const subscriptions = await sql`
-      SELECT endpoint, p256dh, auth
-      FROM push_subscriptions
-    `;
+    if (subscriptionsError) {
+      console.error('[PUSH] Erro ao buscar subscriptions:', subscriptionsError);
+    }
 
-    if (!subscriptions || subscriptions.length === 0) {
-      console.warn('[PUSH] ⚠️ Nenhuma subscription encontrada no banco de dados');
-      console.warn('[PUSH] Verifique se há usuários inscritos na tabela push_subscriptions');
+    // Buscar todos os tokens Expo (React Native)
+    const { data: expoTokens, error: tokensError } = await supabase
+      .from('expo_push_tokens')
+      .select('token');
+
+    if (tokensError) {
+      console.error('[PUSH] Erro ao buscar tokens Expo:', tokensError);
+    }
+
+    const totalSubscribers = (subscriptions?.length || 0) + (expoTokens?.length || 0);
+
+    if (totalSubscribers === 0) {
+      console.warn('[PUSH] ⚠️ Nenhum subscriber encontrado no banco de dados');
+      console.warn('[PUSH] Verifique se há usuários inscritos nas tabelas push_subscriptions ou expo_push_tokens');
       return;
     }
 
-    console.log(`[PUSH] ✅ Encontradas ${subscriptions.length} subscription(s)`);
-    console.log(`[PUSH] Enviando notificação para ${subscriptions.length} dispositivo(s)`);
+    console.log(`[PUSH] ✅ Encontrados ${totalSubscribers} subscriber(s)`);
+    console.log(`[PUSH] - Web Push: ${subscriptions?.length || 0}`);
+    console.log(`[PUSH] - Expo Push: ${expoTokens?.length || 0}`);
 
-    // Preparar payload da notificação
-    const payload = JSON.stringify({
-      title,
-      body,
-      icon: '/icon-192.png',
-      badge: '/badge-72.png',
-      tag: 'takepips-notification',
-      requireInteraction: false,
-      data: data || {},
-    });
+    const sendPromises: Promise<any>[] = [];
 
-    // Enviar para cada subscription
-    const sendPromises = subscriptions.map(async (sub: any) => {
+    // Enviar para Web Push subscriptions
+    if (subscriptions && subscriptions.length > 0) {
+      const payload = JSON.stringify({
+        title,
+        body,
+        icon: '/icon-192.png',
+        badge: '/badge-72.png',
+        tag: 'takepips-notification',
+        requireInteraction: false,
+        data: data || {},
+      });
+
+      subscriptions.forEach((sub: any) => {
+        sendPromises.push(
+          (async () => {
+            try {
+              const subscription: PushSubscription = {
+                endpoint: sub.endpoint,
+                keys: {
+                  p256dh: sub.p256dh,
+                  auth: sub.auth,
+                },
+              };
+
+              await webpush.sendNotification(subscription, payload);
+              console.log(`[PUSH] ✅ Web Push enviado para: ${sub.endpoint.substring(0, 50)}...`);
+            } catch (error: any) {
+              console.error(`[PUSH] ❌ Erro ao enviar Web Push para ${sub.endpoint.substring(0, 50)}...:`, error);
+
+              // Se a subscription expirou ou é inválida, remover do banco
+              if (error.statusCode === 410 || error.statusCode === 404) {
+                console.log(`[PUSH] 🗑️ Removendo subscription inválida: ${sub.endpoint.substring(0, 50)}...`);
+                await supabase
+                  .from('push_subscriptions')
+                  .delete()
+                  .eq('endpoint', sub.endpoint);
+              }
+            }
+          })()
+        );
+      });
+    }
+
+    // Enviar para Expo Push tokens (React Native)
+    if (expoTokens && expoTokens.length > 0) {
+      const messages = expoTokens.map((tokenRow: any) => ({
+        to: tokenRow.token,
+        sound: 'default',
+        title,
+        body,
+        data: data || {},
+        priority: 'high',
+      }));
+
+      // Enviar via Expo Push Notification Service
       try {
-        const subscription: PushSubscription = {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.p256dh,
-            auth: sub.auth,
+        const response = await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Accept-Encoding': 'gzip, deflate',
+            'Content-Type': 'application/json',
           },
-        };
+          body: JSON.stringify(messages),
+        });
 
-        await webpush.sendNotification(subscription, payload);
-        console.log(`[PUSH] ✅ Notificação enviada para: ${sub.endpoint.substring(0, 50)}...`);
-      } catch (error: any) {
-        console.error(`[PUSH] ❌ Erro ao enviar para ${sub.endpoint.substring(0, 50)}...:`, error);
-
-        // Se a subscription expirou ou é inválida, remover do banco
-        if (error.statusCode === 410 || error.statusCode === 404) {
-          console.log(`[PUSH] 🗑️ Removendo subscription inválida: ${sub.endpoint.substring(0, 50)}...`);
-          await sql`
-            DELETE FROM push_subscriptions
-            WHERE endpoint = ${sub.endpoint}
-          `;
+        if (!response.ok) {
+          const errorData = await response.text();
+          console.error('[PUSH] ❌ Erro ao enviar Expo Push:', errorData);
+        } else {
+          const result = await response.json();
+          console.log(`[PUSH] ✅ Expo Push enviado para ${expoTokens.length} dispositivo(s)`);
+          console.log('[PUSH] Resultado:', result);
         }
+      } catch (error) {
+        console.error('[PUSH] ❌ Erro ao fazer requisição para Expo Push:', error);
       }
-    });
+    }
 
     await Promise.allSettled(sendPromises);
     console.log('[PUSH] ✅ Processo de envio concluído');
