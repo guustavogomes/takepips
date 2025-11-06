@@ -87,8 +87,18 @@ export async function sendPushNotification(
       db: {
         schema: 'public',
       },
+      global: {
+        headers: {
+          'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        },
+      },
     }
   );
+  
+  console.log('[PUSH] Cliente Supabase criado com service role key');
+  console.log('[PUSH] URL:', process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...');
+  console.log('[PUSH] Service Role Key presente:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Sim' : 'Não');
+  console.log('[PUSH] Service Role Key length:', process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0);
 
   try {
     console.log('[PUSH] Entrando no bloco try para buscar subscribers...');
@@ -100,9 +110,17 @@ export async function sendPushNotification(
     let subscriptions: any[] = [];
     try {
       console.log('[PUSH] Aguardando resposta do Supabase...');
-      const result = await supabase
+      
+      // Adicionar timeout de 3 segundos
+      const queryPromise = supabase
         .from('push_subscriptions')
         .select('endpoint, p256dh, auth');
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout após 3 segundos')), 3000)
+      );
+      
+      const result = await Promise.race([queryPromise, timeoutPromise]) as any;
       
       console.log('[PUSH] Resposta recebida do Supabase');
       console.log('[PUSH] Result data:', result.data ? `${result.data.length} items` : 'null');
@@ -133,9 +151,17 @@ export async function sendPushNotification(
     let expoTokens: any[] = [];
     try {
       console.log('[PUSH] Aguardando resposta do Supabase para tokens Expo...');
-      const result = await supabase
+      
+      // Adicionar timeout de 3 segundos
+      const queryPromise = supabase
         .from('expo_push_tokens')
         .select('token, platform, device_id, created_at');
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout após 3 segundos')), 3000)
+      );
+      
+      const result = await Promise.race([queryPromise, timeoutPromise]) as any;
       
       console.log('[PUSH] Resposta recebida do Supabase para tokens Expo');
       console.log('[PUSH] Result data:', result.data ? `${result.data.length} items` : 'null');
