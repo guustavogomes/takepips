@@ -67,10 +67,13 @@ export async function sendPushNotification(
   console.log('[PUSH] ✅ VAPID configurado com sucesso');
 
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error('[PUSH] Supabase não configurado');
+    console.error('[PUSH] ❌ Supabase não configurado');
+    console.error('[PUSH] NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Configurado' : 'NÃO CONFIGURADO');
+    console.error('[PUSH] SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Configurado' : 'NÃO CONFIGURADO');
     return;
   }
 
+  console.log('[PUSH] ✅ Supabase configurado, criando cliente...');
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -81,8 +84,10 @@ export async function sendPushNotification(
       },
     }
   );
+  console.log('[PUSH] ✅ Cliente Supabase criado, iniciando busca de subscribers...');
 
   try {
+    console.log('[PUSH] Entrando no bloco try para buscar subscribers...');
     // Buscar todas as subscriptions (Web Push)
     const { data: subscriptions, error: subscriptionsError } = await supabase
       .from('push_subscriptions')
