@@ -113,20 +113,23 @@ export default async function handler(
     const finalHitPrice = status === 'EM_OPERACAO' ? (hitPrice || 0) : hitPrice;
     const updatedSignal = await signalRepository.updateStatus(id, status, finalHitPrice);
 
-    // Enviar notificação push (não bloqueia a resposta)
-    // Se for EM_OPERACAO, usar função específica para entrada atingida
-    if (status === 'EM_OPERACAO') {
-      const entryPrice = hitPrice || updatedSignal.entry;
-      notifyEntryHit(updatedSignal.type, updatedSignal.symbol, entryPrice)
-        .catch(error => {
-          console.error('[PUSH] Erro ao enviar notificação de entrada (não crítico):', error);
-        });
-    } else {
-      // Se for TAKE3, o status no banco será ENCERRADO, mas a notificação ainda mostra TAKE3
-      notifySignalUpdate(updatedSignal.type, updatedSignal.symbol, status, hitPrice)
-        .catch(error => {
-          console.error('[PUSH] Erro ao enviar notificação (não crítico):', error);
-        });
+    // Enviar notificação push
+    // IMPORTANTE: Usar await para garantir que a função complete antes de retornar
+    // No Vercel, funções assíncronas sem await podem ser interrompidas após retornar a resposta
+    try {
+      // Se for EM_OPERACAO, usar função específica para entrada atingida
+      if (status === 'EM_OPERACAO') {
+        const entryPrice = hitPrice || updatedSignal.entry;
+        await notifyEntryHit(updatedSignal.type, updatedSignal.symbol, entryPrice);
+        console.log('[PUSH] ✅ Notificação de entrada enviada com sucesso');
+      } else {
+        // Se for TAKE3, o status no banco será ENCERRADO, mas a notificação ainda mostra TAKE3
+        await notifySignalUpdate(updatedSignal.type, updatedSignal.symbol, status, hitPrice);
+        console.log('[PUSH] ✅ Notificação de atualização enviada com sucesso');
+      }
+    } catch (error) {
+      console.error('[PUSH] ❌ Erro ao enviar notificação (não crítico):', error);
+      // Não bloquear a resposta em caso de erro na notificação
     }
 
     // Log quando Take 3 encerra automaticamente

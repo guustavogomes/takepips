@@ -29,26 +29,26 @@ export class SignalController {
       // Executar use case
       const signal = await this.createSignalUseCase.execute(validatedData as CreateSignalData);
 
-      // Enviar notificação push para novo sinal (não bloqueia a resposta)
+      // Enviar notificação push para novo sinal
       console.log('[SIGNAL] Novo sinal criado, enviando notificação push...', {
         id: signal.id,
         type: signal.type,
         symbol: signal.symbol
       });
       
-      // Enviar notificação push para novo sinal (não bloqueia a resposta)
-      // IMPORTANTE: No Vercel, funções assíncronas podem ser interrompidas após retornar a resposta
-      // Por isso usamos .then()/.catch() para não bloquear, mas isso pode causar execução incompleta
-      notifyNewSignal(signal.type, signal.symbol, signal.entry, signal.stopLoss, signal.take1)
-        .then(() => {
-          console.log('[PUSH] ✅ Notificação de novo sinal enviada com sucesso');
-        })
-        .catch(error => {
-          console.error('[PUSH] ❌ Erro ao enviar notificação de novo sinal:', error);
-          console.error('[PUSH] Tipo do erro:', error?.constructor?.name);
-          console.error('[PUSH] Stack:', error instanceof Error ? error.stack : 'N/A');
-          console.error('[PUSH] Erro completo:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-        });
+      // IMPORTANTE: Usar await para garantir que a função complete antes de retornar
+      // No Vercel, funções assíncronas sem await podem ser interrompidas após retornar a resposta
+      // Isso garante que as notificações sejam enviadas antes de retornar
+      try {
+        await notifyNewSignal(signal.type, signal.symbol, signal.entry, signal.stopLoss, signal.take1);
+        console.log('[PUSH] ✅ Notificação de novo sinal enviada com sucesso');
+      } catch (error) {
+        console.error('[PUSH] ❌ Erro ao enviar notificação de novo sinal:', error);
+        console.error('[PUSH] Tipo do erro:', error?.constructor?.name);
+        console.error('[PUSH] Stack:', error instanceof Error ? error.stack : 'N/A');
+        console.error('[PUSH] Erro completo:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        // Não bloquear a resposta em caso de erro na notificação
+      }
 
       // Retornar resposta de sucesso
       const response: ApiResponse = {
