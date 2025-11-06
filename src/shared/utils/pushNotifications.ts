@@ -88,20 +88,52 @@ export async function sendPushNotification(
 
   try {
     console.log('[PUSH] Entrando no bloco try para buscar subscribers...');
+    
     // Buscar todas as subscriptions (Web Push)
-    const { data: subscriptions, error: subscriptionsError } = await supabase
-      .from('push_subscriptions')
-      .select('endpoint, p256dh, auth');
-
+    console.log('[PUSH] Buscando Web Push subscriptions...');
+    console.log('[PUSH] Executando query: SELECT endpoint, p256dh, auth FROM push_subscriptions');
+    
+    let subscriptions, subscriptionsError;
+    try {
+      const result = await supabase
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth');
+      subscriptions = result.data;
+      subscriptionsError = result.error;
+      console.log('[PUSH] Query de Web Push subscriptions executada com sucesso');
+    } catch (queryError) {
+      console.error('[PUSH] ❌ Exceção ao executar query de Web Push:', queryError);
+      subscriptions = null;
+      subscriptionsError = queryError as any;
+    }
+    
+    console.log('[PUSH] Busca de Web Push subscriptions concluída');
     if (subscriptionsError) {
-      console.error('[PUSH] Erro ao buscar subscriptions:', subscriptionsError);
+      console.error('[PUSH] ❌ Erro ao buscar subscriptions:', subscriptionsError);
+      console.error('[PUSH] Detalhes do erro:', JSON.stringify(subscriptionsError, null, 2));
+    } else {
+      console.log(`[PUSH] Web Push subscriptions encontradas: ${subscriptions?.length || 0}`);
     }
 
     // Buscar todos os tokens Expo (React Native)
     console.log('[PUSH] Buscando tokens Expo na tabela expo_push_tokens...');
-    const { data: expoTokens, error: tokensError } = await supabase
-      .from('expo_push_tokens')
-      .select('token, platform, device_id, created_at');
+    console.log('[PUSH] Executando query: SELECT token, platform, device_id, created_at FROM expo_push_tokens');
+    
+    let expoTokens, tokensError;
+    try {
+      const result = await supabase
+        .from('expo_push_tokens')
+        .select('token, platform, device_id, created_at');
+      expoTokens = result.data;
+      tokensError = result.error;
+      console.log('[PUSH] Query de tokens Expo executada com sucesso');
+    } catch (queryError) {
+      console.error('[PUSH] ❌ Exceção ao executar query de tokens Expo:', queryError);
+      expoTokens = null;
+      tokensError = queryError as any;
+    }
+    
+    console.log('[PUSH] Busca de tokens Expo concluída');
 
     if (tokensError) {
       console.error('[PUSH] ❌ Erro ao buscar tokens Expo:', tokensError);
@@ -237,7 +269,13 @@ export async function sendPushNotification(
     await Promise.allSettled(sendPromises);
     console.log('[PUSH] ✅ Processo de envio concluído');
   } catch (error) {
-    console.error('[PUSH] ❌ Erro ao buscar subscriptions:', error);
+    console.error('[PUSH] ❌ Erro no bloco try/catch:', error);
+    if (error instanceof Error) {
+      console.error('[PUSH] Mensagem de erro:', error.message);
+      console.error('[PUSH] Stack trace:', error.stack);
+    } else {
+      console.error('[PUSH] Erro completo:', JSON.stringify(error, null, 2));
+    }
   }
 }
 

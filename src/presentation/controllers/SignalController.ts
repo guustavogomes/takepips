@@ -36,13 +36,18 @@ export class SignalController {
         symbol: signal.symbol
       });
       
+      // Enviar notificação push para novo sinal (não bloqueia a resposta)
+      // IMPORTANTE: No Vercel, funções assíncronas podem ser interrompidas após retornar a resposta
+      // Por isso usamos .then()/.catch() para não bloquear, mas isso pode causar execução incompleta
       notifyNewSignal(signal.type, signal.symbol, signal.entry, signal.stopLoss, signal.take1)
         .then(() => {
           console.log('[PUSH] ✅ Notificação de novo sinal enviada com sucesso');
         })
         .catch(error => {
           console.error('[PUSH] ❌ Erro ao enviar notificação de novo sinal:', error);
+          console.error('[PUSH] Tipo do erro:', error?.constructor?.name);
           console.error('[PUSH] Stack:', error instanceof Error ? error.stack : 'N/A');
+          console.error('[PUSH] Erro completo:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
         });
 
       // Retornar resposta de sucesso
