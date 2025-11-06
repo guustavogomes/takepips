@@ -45,7 +45,15 @@ export default async function handler(
     }
 
     // Suporta tanto Web Push (subscription) quanto Expo Push (token)
+    console.log('[API] Body recebido:', JSON.stringify(req.body, null, 2));
     const { subscription, token, platform, deviceId } = req.body;
+    
+    console.log('[API] Dados extraídos:', {
+      hasToken: !!token,
+      hasSubscription: !!subscription,
+      platform,
+      deviceId,
+    });
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

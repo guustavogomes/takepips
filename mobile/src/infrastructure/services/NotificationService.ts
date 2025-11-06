@@ -61,32 +61,47 @@ export class NotificationService {
    * Retorna null no Expo Go para evitar erros.
    */
   async getExpoPushToken(): Promise<string | null> {
+    console.log('[NotificationService] getExpoPushToken chamado');
+    console.log('[NotificationService] Constants.appOwnership:', Constants.appOwnership);
+    console.log('[NotificationService] isExpoGo:', isExpoGo);
+    console.log('[NotificationService] Device.isDevice:', Device.isDevice);
+    
     // Bloquear completamente no Expo Go para evitar erros
     if (isExpoGo) {
-      console.log('[NotificationService] Expo Go detectado - push notifications remotas não disponíveis');
+      console.log('[NotificationService] ⚠️ Expo Go detectado - push notifications remotas não disponíveis');
       console.log('[NotificationService] Use notificações locais ou crie um development build');
       return null;
     }
 
     if (!Device.isDevice) {
-      console.log('[NotificationService] Simulador/emulador detectado - push notifications desabilitadas');
+      console.log('[NotificationService] ⚠️ Simulador/emulador detectado - push notifications desabilitadas');
       return null;
     }
 
+    console.log('[NotificationService] Solicitando permissões...');
     const hasPermission = await this.requestPermissions();
+    console.log('[NotificationService] Permissão concedida:', hasPermission);
+    
     if (!hasPermission) {
+      console.log('[NotificationService] ❌ Permissão negada - não é possível obter token');
       return null;
     }
 
     try {
+      console.log('[NotificationService] Tentando obter Expo Push Token...');
       // Apenas tenta obter token em development builds ou standalone apps
       const tokenData = await Notifications.getExpoPushTokenAsync();
 
-      console.log('[NotificationService] Push token obtido com sucesso');
+      console.log('[NotificationService] ✅ Push token obtido com sucesso');
+      console.log('[NotificationService] Token completo:', tokenData.data);
       return tokenData.data;
     } catch (error: any) {
       // Erros inesperados
-      console.error('[NotificationService] Erro ao obter push token:', error);
+      console.error('[NotificationService] ❌ Erro ao obter push token:', error);
+      if (error instanceof Error) {
+        console.error('[NotificationService] Mensagem de erro:', error.message);
+        console.error('[NotificationService] Stack:', error.stack);
+      }
       return null;
     }
   }
