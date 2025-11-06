@@ -95,17 +95,24 @@ export async function sendPushNotification(
     
     // Buscar todas as subscriptions (Web Push)
     console.log('[PUSH] Buscando Web Push subscriptions...');
+    console.log('[PUSH] Executando query Supabase: .from("push_subscriptions").select(...)');
     
     let subscriptions: any[] = [];
     try {
-      const { data, error } = await supabase
+      console.log('[PUSH] Aguardando resposta do Supabase...');
+      const result = await supabase
         .from('push_subscriptions')
         .select('endpoint, p256dh, auth');
       
-      if (error) {
-        console.error('[PUSH] ❌ Erro ao buscar Web Push subscriptions:', error);
+      console.log('[PUSH] Resposta recebida do Supabase');
+      console.log('[PUSH] Result data:', result.data ? `${result.data.length} items` : 'null');
+      console.log('[PUSH] Result error:', result.error ? JSON.stringify(result.error) : 'null');
+      
+      if (result.error) {
+        console.error('[PUSH] ❌ Erro ao buscar Web Push subscriptions:', result.error);
+        console.error('[PUSH] Detalhes do erro:', JSON.stringify(result.error, null, 2));
       } else {
-        subscriptions = data || [];
+        subscriptions = result.data || [];
         console.log('[PUSH] ✅ Query de Web Push subscriptions executada com sucesso');
         console.log(`[PUSH] Web Push subscriptions encontradas: ${subscriptions.length}`);
       }
@@ -113,22 +120,32 @@ export async function sendPushNotification(
       console.error('[PUSH] ❌ Exceção ao executar query de Web Push:', queryError);
       if (queryError instanceof Error) {
         console.error('[PUSH] Mensagem de erro:', queryError.message);
+        console.error('[PUSH] Stack:', queryError.stack);
       }
     }
+    
+    console.log('[PUSH] Busca de Web Push subscriptions concluída');
 
     // Buscar todos os tokens Expo (React Native)
     console.log('[PUSH] Buscando tokens Expo na tabela expo_push_tokens...');
+    console.log('[PUSH] Executando query Supabase: .from("expo_push_tokens").select(...)');
     
     let expoTokens: any[] = [];
     try {
-      const { data, error } = await supabase
+      console.log('[PUSH] Aguardando resposta do Supabase para tokens Expo...');
+      const result = await supabase
         .from('expo_push_tokens')
         .select('token, platform, device_id, created_at');
       
-      if (error) {
-        console.error('[PUSH] ❌ Erro ao buscar tokens Expo:', error);
+      console.log('[PUSH] Resposta recebida do Supabase para tokens Expo');
+      console.log('[PUSH] Result data:', result.data ? `${result.data.length} items` : 'null');
+      console.log('[PUSH] Result error:', result.error ? JSON.stringify(result.error) : 'null');
+      
+      if (result.error) {
+        console.error('[PUSH] ❌ Erro ao buscar tokens Expo:', result.error);
+        console.error('[PUSH] Detalhes do erro:', JSON.stringify(result.error, null, 2));
       } else {
-        expoTokens = data || [];
+        expoTokens = result.data || [];
         console.log('[PUSH] ✅ Query de tokens Expo executada com sucesso');
         console.log(`[PUSH] Tokens Expo encontrados: ${expoTokens.length}`);
         
@@ -143,6 +160,7 @@ export async function sendPushNotification(
       console.error('[PUSH] ❌ Exceção ao executar query de tokens Expo:', queryError);
       if (queryError instanceof Error) {
         console.error('[PUSH] Mensagem de erro:', queryError.message);
+        console.error('[PUSH] Stack:', queryError.stack);
       }
     }
     
