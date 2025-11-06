@@ -1,5 +1,6 @@
 import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
+import { neon } from '@neondatabase/serverless';
 
 interface PushSubscription {
   endpoint: string;
@@ -73,82 +74,68 @@ export async function sendPushNotification(
     return;
   }
 
-  console.log('[PUSH] ✅ Supabase configurado, criando cliente...');
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
-  console.log('[PUSH] ✅ Cliente Supabase criado, iniciando busca de subscribers...');
+  // Usar conexão direta PostgreSQL (como era com Neon) para queries mais rápidas
+  if (!process.env.DATABASE_URL) {
+    console.error('[PUSH] ❌ DATABASE_URL não configurada');
+    console.error('[PUSH] Configure DATABASE_URL nas variáveis de ambiente do Vercel');
+    console.error('[PUSH] Formato: postgresql://user:password@host:5432/database');
+    return;
+  }
+
+  console.log('[PUSH] ✅ DATABASE_URL configurada, usando conexão direta PostgreSQL...');
+  const sql = neon(process.env.DATABASE_URL);
 
   try {
     console.log('[PUSH] Entrando no bloco try para buscar subscribers...');
     
-    // Buscar todas as subscriptions (Web Push)
+    // Buscar todas as subscriptions (Web Push) - Query direta SQL
     console.log('[PUSH] Buscando Web Push subscriptions...');
-    console.log('[PUSH] Executando query: SELECT endpoint, p256dh, auth FROM push_subscriptions');
+    console.log('[PUSH] Executando query SQL direta: SELECT endpoint, p256dh, auth FROM push_subscriptions');
     
-    let subscriptions, subscriptionsError;
+    let subscriptions: any[] = [];
     try {
-      const result = await supabase
-        .from('push_subscriptions')
-        .select('endpoint, p256dh, auth');
-      subscriptions = result.data;
-      subscriptionsError = result.error;
-      console.log('[PUSH] Query de Web Push subscriptions executada com sucesso');
+      subscriptions = await sql`
+        SELECT endpoint, p256dh, auth 
+        FROM push_subscriptions
+      `;
+      console.log('[PUSH] ✅ Query de Web Push subscriptions executada com sucesso');
+      console.log(`[PUSH] Web Push subscriptions encontradas: ${subscriptions.length}`);
     } catch (queryError) {
       console.error('[PUSH] ❌ Exceção ao executar query de Web Push:', queryError);
-      subscriptions = null;
-      subscriptionsError = queryError as any;
-    }
-    
-    console.log('[PUSH] Busca de Web Push subscriptions concluída');
-    if (subscriptionsError) {
-      console.error('[PUSH] ❌ Erro ao buscar subscriptions:', subscriptionsError);
-      console.error('[PUSH] Detalhes do erro:', JSON.stringify(subscriptionsError, null, 2));
-    } else {
-      console.log(`[PUSH] Web Push subscriptions encontradas: ${subscriptions?.length || 0}`);
+      if (queryError instanceof Error) {
+        console.error('[PUSH] Mensagem de erro:', queryError.message);
+      }
     }
 
-    // Buscar todos os tokens Expo (React Native)
+    // Buscar todos os tokens Expo (React Native) - Query direta SQL
     console.log('[PUSH] Buscando tokens Expo na tabela expo_push_tokens...');
-    console.log('[PUSH] Executando query: SELECT token, platform, device_id, created_at FROM expo_push_tokens');
+    console.log('[PUSH] Executando query SQL direta: SELECT token, platform, device_id, created_at FROM expo_push_tokens');
     
-    let expoTokens, tokensError;
+    let expoTokens: any[] = [];
     try {
-      const result = await supabase
-        .from('expo_push_tokens')
-        .select('token, platform, device_id, created_at');
-      expoTokens = result.data;
-      tokensError = result.error;
-      console.log('[PUSH] Query de tokens Expo executada com sucesso');
-    } catch (queryError) {
-      console.error('[PUSH] ❌ Exceção ao executar query de tokens Expo:', queryError);
-      expoTokens = null;
-      tokensError = queryError as any;
-    }
-    
-    console.log('[PUSH] Busca de tokens Expo concluída');
-
-    if (tokensError) {
-      console.error('[PUSH] ❌ Erro ao buscar tokens Expo:', tokensError);
-      console.error('[PUSH] Detalhes do erro:', JSON.stringify(tokensError, null, 2));
-    } else {
-      console.log(`[PUSH] ✅ Busca de tokens Expo concluída. Encontrados: ${expoTokens?.length || 0}`);
-      if (expoTokens && expoTokens.length > 0) {
+      expoTokens = await sql`
+        SELECT token, platform, device_id, created_at 
+        FROM expo_push_tokens
+      `;
+      console.log('[PUSH] ✅ Query de tokens Expo executada com sucesso');
+      console.log(`[PUSH] Tokens Expo encontrados: ${expoTokens.length}`);
+      
+      if (expoTokens.length > 0) {
         console.log('[PUSH] Tokens encontrados:');
         expoTokens.forEach((tokenRow: any, index: number) => {
           console.log(`[PUSH]   ${index + 1}. Token: ${tokenRow.token.substring(0, 30)}... | Platform: ${tokenRow.platform} | Device: ${tokenRow.device_id}`);
         });
       }
+    } catch (queryError) {
+      console.error('[PUSH] ❌ Exceção ao executar query de tokens Expo:', queryError);
+      if (queryError instanceof Error) {
+        console.error('[PUSH] Mensagem de erro:', queryError.message);
+      }
     }
+    
+    console.log('[PUSH] Busca de tokens Expo concluída');
 
-    const totalSubscribers = (subscriptions?.length || 0) + (expoTokens?.length || 0);
+    const totalSubscribers = subscriptions.length + expoTokens.length;
 
     if (totalSubscribers === 0) {
       console.warn('[PUSH] ⚠️ Nenhum subscriber encontrado no banco de dados');
@@ -158,8 +145,8 @@ export async function sendPushNotification(
     }
 
     console.log(`[PUSH] ✅ Encontrados ${totalSubscribers} subscriber(s)`);
-    console.log(`[PUSH] - Web Push: ${subscriptions?.length || 0}`);
-    console.log(`[PUSH] - Expo Push: ${expoTokens?.length || 0}`);
+    console.log(`[PUSH] - Web Push: ${subscriptions.length}`);
+    console.log(`[PUSH] - Expo Push: ${expoTokens.length}`);
 
     const sendPromises: Promise<any>[] = [];
 
@@ -195,10 +182,11 @@ export async function sendPushNotification(
               // Se a subscription expirou ou é inválida, remover do banco
               if (error.statusCode === 410 || error.statusCode === 404) {
                 console.log(`[PUSH] 🗑️ Removendo subscription inválida: ${sub.endpoint.substring(0, 50)}...`);
-                await supabase
-                  .from('push_subscriptions')
-                  .delete()
-                  .eq('endpoint', sub.endpoint);
+                try {
+                  await sql`DELETE FROM push_subscriptions WHERE endpoint = ${sub.endpoint}`;
+                } catch (deleteError) {
+                  console.error('[PUSH] Erro ao remover subscription:', deleteError);
+                }
               }
             }
           })()
