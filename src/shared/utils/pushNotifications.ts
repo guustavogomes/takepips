@@ -93,12 +93,22 @@ export async function sendPushNotification(
     }
 
     // Buscar todos os tokens Expo (React Native)
+    console.log('[PUSH] Buscando tokens Expo na tabela expo_push_tokens...');
     const { data: expoTokens, error: tokensError } = await supabase
       .from('expo_push_tokens')
-      .select('token');
+      .select('token, platform, device_id, created_at');
 
     if (tokensError) {
-      console.error('[PUSH] Erro ao buscar tokens Expo:', tokensError);
+      console.error('[PUSH] ❌ Erro ao buscar tokens Expo:', tokensError);
+      console.error('[PUSH] Detalhes do erro:', JSON.stringify(tokensError, null, 2));
+    } else {
+      console.log(`[PUSH] ✅ Busca de tokens Expo concluída. Encontrados: ${expoTokens?.length || 0}`);
+      if (expoTokens && expoTokens.length > 0) {
+        console.log('[PUSH] Tokens encontrados:');
+        expoTokens.forEach((tokenRow: any, index: number) => {
+          console.log(`[PUSH]   ${index + 1}. Token: ${tokenRow.token.substring(0, 30)}... | Platform: ${tokenRow.platform} | Device: ${tokenRow.device_id}`);
+        });
+      }
     }
 
     const totalSubscribers = (subscriptions?.length || 0) + (expoTokens?.length || 0);
@@ -106,6 +116,7 @@ export async function sendPushNotification(
     if (totalSubscribers === 0) {
       console.warn('[PUSH] ⚠️ Nenhum subscriber encontrado no banco de dados');
       console.warn('[PUSH] Verifique se há usuários inscritos nas tabelas push_subscriptions ou expo_push_tokens');
+      console.warn('[PUSH] Para verificar tokens no Supabase, execute: SELECT * FROM expo_push_tokens;');
       return;
     }
 
@@ -160,6 +171,7 @@ export async function sendPushNotification(
 
     // Enviar para Expo Push tokens (React Native)
     if (expoTokens && expoTokens.length > 0) {
+      console.log(`[PUSH] Preparando ${expoTokens.length} mensagem(ns) para Expo Push...`);
       const messages = expoTokens.map((tokenRow: any) => ({
         to: tokenRow.token,
         sound: 'default',
@@ -169,8 +181,11 @@ export async function sendPushNotification(
         priority: 'high',
       }));
 
+      console.log('[PUSH] Mensagens preparadas:', JSON.stringify(messages, null, 2));
+
       // Enviar via Expo Push Notification Service
       try {
+        console.log('[PUSH] Enviando requisição para Expo Push API...');
         const response = await fetch('https://exp.host/--/api/v2/push/send', {
           method: 'POST',
           headers: {
@@ -181,17 +196,37 @@ export async function sendPushNotification(
           body: JSON.stringify(messages),
         });
 
+        console.log('[PUSH] Status da resposta:', response.status, response.statusText);
+
         if (!response.ok) {
           const errorData = await response.text();
           console.error('[PUSH] ❌ Erro ao enviar Expo Push:', errorData);
+          console.error('[PUSH] Status:', response.status);
         } else {
           const result = await response.json();
           console.log(`[PUSH] ✅ Expo Push enviado para ${expoTokens.length} dispositivo(s)`);
-          console.log('[PUSH] Resultado:', result);
+          console.log('[PUSH] Resultado completo:', JSON.stringify(result, null, 2));
+          
+          // Verificar se há erros na resposta
+          if (result.data && Array.isArray(result.data)) {
+            result.data.forEach((receipt: any, index: number) => {
+              if (receipt.status === 'error') {
+                console.error(`[PUSH] ❌ Erro no token ${index + 1}:`, receipt.message);
+              } else {
+                console.log(`[PUSH] ✅ Token ${index + 1} enviado com sucesso`);
+              }
+            });
+          }
         }
       } catch (error) {
         console.error('[PUSH] ❌ Erro ao fazer requisição para Expo Push:', error);
+        if (error instanceof Error) {
+          console.error('[PUSH] Mensagem de erro:', error.message);
+          console.error('[PUSH] Stack:', error.stack);
+        }
       }
+    } else {
+      console.warn('[PUSH] ⚠️ Nenhum token Expo encontrado para enviar notificação');
     }
 
     await Promise.allSettled(sendPromises);

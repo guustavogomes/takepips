@@ -96,14 +96,28 @@ export class NotificationService {
    */
   async registerDevice(expoPushToken: string): Promise<void> {
     try {
-      await apiClient.post('/api/push/subscribe', {
+      console.log('[NotificationService] Registrando dispositivo no backend...');
+      console.log('[NotificationService] Token:', expoPushToken.substring(0, 30) + '...');
+      console.log('[NotificationService] Platform:', Platform.OS);
+      console.log('[NotificationService] Device ID:', Device.modelName || 'unknown');
+      
+      const response = await apiClient.post('/api/push/subscribe', {
         token: expoPushToken,
         platform: Platform.OS,
         deviceId: Device.modelName || 'unknown',
       });
-      console.log('[NotificationService] Device registered successfully');
-    } catch (error) {
-      console.error('[NotificationService] Error registering device:', error);
+      
+      console.log('[NotificationService] ✅ Resposta do backend:', response.data);
+      console.log('[NotificationService] ✅ Device registered successfully');
+    } catch (error: any) {
+      console.error('[NotificationService] ❌ Error registering device:', error);
+      if (error.response) {
+        console.error('[NotificationService] Response status:', error.response.status);
+        console.error('[NotificationService] Response data:', error.response.data);
+      }
+      if (error.request) {
+        console.error('[NotificationService] Request made but no response received');
+      }
       throw error;
     }
   }

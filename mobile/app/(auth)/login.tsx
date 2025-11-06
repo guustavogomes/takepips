@@ -13,6 +13,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -67,7 +68,11 @@ export default function LoginScreen() {
           <View style={styles.content}>
             {/* Logo */}
             <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>TakePips</Text>
+              <Image
+                source={require('../../assets/logo.jpeg')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
               <Text style={styles.subtitle}>Bem-vindo de volta</Text>
             </View>
 
@@ -145,7 +150,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0E27',
+    backgroundColor: '#161614',
   },
   keyboardView: {
     flex: 1,
@@ -164,12 +169,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 48,
   },
-  logoText: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#FFD700',
+  logoImage: {
+    width: 200,
+    height: 200,
     marginBottom: 8,
-    letterSpacing: 2,
   },
   subtitle: {
     fontSize: 16,

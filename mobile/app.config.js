@@ -13,9 +13,9 @@ export default {
     icon: './assets/icon.png',
     userInterfaceStyle: 'automatic',
     splash: {
-      image: './assets/splash.png',
+      image: './assets/logo.jpeg',
       resizeMode: 'contain',
-      backgroundColor: '#0A0E27',
+      backgroundColor: '#161614',
     },
     assetBundlePatterns: ['**/*'],
     ios: {
@@ -32,7 +32,7 @@ export default {
         backgroundColor: '#0A0E27',
       },
       package: 'com.takepips.mobile',
-      permissions: ['RECEIVE_BOOT_COMPLETED'],
+      permissions: ['RECEIVE_BOOT_COMPLETED', 'POST_NOTIFICATIONS'],
     },
     web: {
       favicon: './assets/favicon.png',

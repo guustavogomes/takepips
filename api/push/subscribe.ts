@@ -80,7 +80,23 @@ export default async function handler(
         throw upsertError;
       }
 
-      console.log('✅ Expo Push Token salvo:', token);
+      console.log('[API] ✅ Expo Push Token salvo com sucesso');
+      console.log('[API] Token:', token.substring(0, 30) + '...');
+      console.log('[API] Platform:', platform || 'unknown');
+      console.log('[API] Device ID:', deviceId || 'unknown');
+      
+      // Verificar se foi realmente salvo
+      const { data: savedToken, error: checkError } = await supabase
+        .from('expo_push_tokens')
+        .select('*')
+        .eq('token', token)
+        .single();
+      
+      if (checkError) {
+        console.error('[API] ⚠️ Erro ao verificar token salvo:', checkError);
+      } else {
+        console.log('[API] ✅ Token verificado no banco de dados:', savedToken);
+      }
       
       res.status(200).json({
         success: true,

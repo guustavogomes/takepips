@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, Dimensions, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useCurrentUser } from '@/presentation/hooks/useAuth';
@@ -178,7 +178,11 @@ export default function SplashScreenComponent() {
           },
         ]}
       >
-        <Text style={styles.logoText}>TakePips</Text>
+        <Image
+          source={require('../../assets/logo.jpeg')}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
       </Animated.View>
 
       {/* Candles de baixa (vermelho) */}
@@ -224,7 +228,7 @@ export default function SplashScreenComponent() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0E27',
+    backgroundColor: '#161614',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -232,14 +236,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoText: {
-    fontSize: 56,
-    fontWeight: 'bold',
-    color: '#FFD700', // Amarelo ouro
-    textShadowColor: 'rgba(255, 215, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 20,
-    letterSpacing: 4,
+  logoImage: {
+    width: width * 0.7,
+    height: width * 0.7,
+    maxWidth: 300,
+    maxHeight: 300,
   },
   candle: {
     position: 'absolute',
