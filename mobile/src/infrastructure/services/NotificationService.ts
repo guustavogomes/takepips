@@ -111,27 +111,48 @@ export class NotificationService {
    */
   async registerDevice(expoPushToken: string): Promise<void> {
     try {
-      console.log('[NotificationService] Registrando dispositivo no backend...');
-      console.log('[NotificationService] Token:', expoPushToken.substring(0, 30) + '...');
+      console.log('[NotificationService] ========================================');
+      console.log('[NotificationService] 📤 Registrando dispositivo no backend...');
+      console.log('[NotificationService] Token (primeiros 50 chars):', expoPushToken.substring(0, 50) + '...');
       console.log('[NotificationService] Platform:', Platform.OS);
       console.log('[NotificationService] Device ID:', Device.modelName || 'unknown');
       
-      const response = await apiClient.post('/api/push/subscribe', {
+      // Verificar URL do API
+      const apiUrl = Constants.expoConfig?.extra?.apiUrl || 'https://takepips.vercel.app';
+      console.log('[NotificationService] API URL:', apiUrl);
+      console.log('[NotificationService] Endpoint completo:', `${apiUrl}/api/push/subscribe`);
+      
+      const payload = {
         token: expoPushToken,
         platform: Platform.OS,
         deviceId: Device.modelName || 'unknown',
-      });
+      };
+      console.log('[NotificationService] Payload:', JSON.stringify(payload, null, 2));
       
-      console.log('[NotificationService] ✅ Resposta do backend:', response.data);
+      console.log('[NotificationService] Fazendo requisição POST...');
+      const response = await apiClient.post('/api/push/subscribe', payload);
+      
+      console.log('[NotificationService] ✅ Resposta recebida do backend!');
+      console.log('[NotificationService] Response data:', JSON.stringify(response, null, 2));
       console.log('[NotificationService] ✅ Device registered successfully');
+      console.log('[NotificationService] ========================================');
     } catch (error: any) {
-      console.error('[NotificationService] ❌ Error registering device:', error);
+      console.error('[NotificationService] ❌❌❌ ERRO ao registrar dispositivo:', error);
+      if (error instanceof Error) {
+        console.error('[NotificationService] Mensagem de erro:', error.message);
+        console.error('[NotificationService] Stack:', error.stack);
+      }
       if (error.response) {
         console.error('[NotificationService] Response status:', error.response.status);
-        console.error('[NotificationService] Response data:', error.response.data);
+        console.error('[NotificationService] Response headers:', error.response.headers);
+        console.error('[NotificationService] Response data:', JSON.stringify(error.response.data, null, 2));
       }
       if (error.request) {
-        console.error('[NotificationService] Request made but no response received');
+        console.error('[NotificationService] ❌ Requisição feita mas sem resposta do servidor');
+        console.error('[NotificationService] Request config:', JSON.stringify(error.config, null, 2));
+      }
+      if (!error.response && !error.request) {
+        console.error('[NotificationService] ❌ Erro ao configurar requisição');
       }
       throw error;
     }
