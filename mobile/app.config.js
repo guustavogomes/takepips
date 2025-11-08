@@ -32,7 +32,14 @@ export default {
         backgroundColor: '#0A0E27',
       },
       package: 'com.takepips.mobile',
-      permissions: ['RECEIVE_BOOT_COMPLETED', 'POST_NOTIFICATIONS'],
+      permissions: [
+        'RECEIVE_BOOT_COMPLETED',
+        'POST_NOTIFICATIONS',
+        'WAKE_LOCK', // Permite acordar o dispositivo para notificações
+      ],
+      // Arquivo de configuração do Firebase para Android
+      googleServicesFile: './google-services.json',
+      useNextNotificationsApi: true, // Usa a API mais recente de notificações
     },
     web: {
       favicon: './assets/favicon.png',
@@ -42,7 +49,20 @@ export default {
       [
         'expo-notifications',
         {
+          icon: './assets/icon.png',
           color: '#4A90E2',
+          defaultChannel: 'default',
+          // Configurações Android para notificações mesmo com app fechado
+          android: {
+            // Canal de notificação com prioridade alta
+            defaultChannel: {
+              importance: 5, // MAX: Aparece na tela + som + vibração
+              showBadge: true,
+              enableLights: true,
+              enableVibration: true,
+              vibrationPattern: [0, 250, 250, 250],
+            },
+          },
         },
       ],
     ],

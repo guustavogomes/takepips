@@ -1,12 +1,12 @@
 /**
  * Presentation Layer - Signal Card Component
  * 
- * Componente elegante para exibir um sinal
- * Seguindo SRP: Apenas renderiza um sinal
+ * Card de sinal com design moderno e indicadores de atualização
  */
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Signal, SignalStatus } from '@/domain/models/Signal';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -17,164 +17,215 @@ interface SignalCardProps {
 }
 
 export const SignalCard: React.FC<SignalCardProps> = ({ signal, onPress }) => {
-  const getStatusColor = (status: SignalStatus): string => {
+  const getStatusInfo = (status: SignalStatus) => {
     switch (status) {
       case 'PENDING':
-        return '#FFA500';
+        return { label: 'PENDENTE', color: '#f59e0b', icon: 'clock-outline' };
       case 'EM_OPERACAO':
-        return '#4A90E2';
+        return { label: 'EM OPERAÇÃO', color: '#3b82f6', icon: 'chart-line' };
       case 'STOP_LOSS':
-        return '#E74C3C';
+        return { label: 'STOP LOSS', color: '#ef4444', icon: 'close-circle' };
       case 'TAKE1':
+        return { label: 'TAKE 1', color: '#10b981', icon: 'check-circle' };
       case 'TAKE2':
+        return { label: 'TAKE 2', color: '#10b981', icon: 'check-circle' };
       case 'TAKE3':
-        return '#2ECC71';
+        return { label: 'TAKE 3', color: '#10b981', icon: 'check-circle' };
       case 'ENCERRADO':
-        return '#95A5A6';
+        return { label: 'ENCERRADO', color: '#6b7280', icon: 'flag-checkered' };
+      case 'CANCELADO':
+        return { label: 'CANCELADO', color: '#9333ea', icon: 'cancel' };
       default:
-        return '#34495E';
+        return { label: status, color: '#6b7280', icon: 'information' };
     }
   };
 
-  const getStatusLabel = (status: SignalStatus): string => {
-    switch (status) {
-      case 'PENDING':
-        return 'Pendente';
-      case 'EM_OPERACAO':
-        return 'Em Operação';
-      case 'STOP_LOSS':
-        return 'Stop Loss';
-      case 'TAKE1':
-        return 'Take 1';
-      case 'TAKE2':
-        return 'Take 2';
-      case 'TAKE3':
-        return 'Take 3';
-      case 'ENCERRADO':
-        return 'Encerrado';
-      default:
-        return status;
+  const getTypeInfo = (type: string) => {
+    if (type === 'BUY') {
+      return { label: 'COMPRA', color: '#10b981', icon: 'arrow-up-bold' };
     }
+    return { label: 'VENDA', color: '#ef4444', icon: 'arrow-down-bold' };
   };
 
-  const getSignalTypeEmoji = (type: string): string => {
-    return type === 'BUY' ? '📈' : '📉';
+  // Verificar se foi atualizado recentemente (últimos 10 segundos)
+  const isRecentlyUpdated = () => {
+    const now = new Date();
+    const diff = now.getTime() - signal.updatedAt.getTime();
+    return diff < 10000; // 10 segundos
   };
 
-  const statusColor = getStatusColor(signal.status);
+  const statusInfo = getStatusInfo(signal.status);
+  const typeInfo = getTypeInfo(signal.type);
   const formattedTime = format(signal.time, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+  const wasRecentlyUpdated = isRecentlyUpdated();
 
-  // Verificar se algum take foi atingido
-  const hasTakeHit = signal.take1HitPrice || signal.take2HitPrice || signal.take3HitPrice;
+  // Verificar takes/stop atingidos
+  const hasTake1Hit = signal.take1HitPrice;
+  const hasTake2Hit = signal.take2HitPrice;
+  const hasTake3Hit = signal.take3HitPrice;
   const hasStopHit = signal.stopHitPrice;
 
-  // Determinar cor de fundo do card baseado nos hits
-  const getCardBackgroundColor = (): string => {
-    // Prioridade: Stop Loss tem prioridade sobre takes
-    if (hasStopHit) {
-      return '#2A1A1A'; // Fundo vermelho escuro
-    }
-    if (hasTakeHit) {
-      return '#1A2A1A'; // Fundo verde escuro
-    }
-    return '#1A1F3A'; // Fundo padrão
-  };
-
-  // Determinar cor da borda do card
-  const getCardBorderColor = (): string => {
-    // Prioridade: Stop Loss tem prioridade sobre takes
-    if (hasStopHit) {
-      return '#E74C3C'; // Borda vermelha
-    }
-    if (hasTakeHit) {
-      return '#2ECC71'; // Borda verde
-    }
-    return '#2A2F4A'; // Borda padrão
+  // Renderizar badge de atualização
+  const renderUpdateBadge = () => {
+    if (!wasRecentlyUpdated) return null;
+    
+    return (
+      <View style={styles.updateBadge}>
+        <MaterialCommunityIcons name="update" size={10} color="#FFFFFF" />
+        <Text style={styles.updateBadgeText}>ATUALIZADO</Text>
+      </View>
+    );
   };
 
   const CardContent = (
     <View style={[
       styles.container,
-      {
-        backgroundColor: getCardBackgroundColor(),
-        borderColor: getCardBorderColor()
-      }
+      hasStopHit && styles.stopHitCard,
+      (hasTake1Hit || hasTake2Hit || hasTake3Hit) && !hasStopHit && styles.takeHitCard,
+      wasRecentlyUpdated && styles.recentlyUpdatedCard,
     ]}>
+      {/* Header: Símbolo e Status */}
       <View style={styles.header}>
-        <View style={styles.symbolContainer}>
-          <Text style={styles.emoji}>{getSignalTypeEmoji(signal.type)}</Text>
+        <View style={styles.symbolSection}>
+          <View style={[styles.typeIndicator, { backgroundColor: typeInfo.color }]}>
+            <MaterialCommunityIcons 
+              name={typeInfo.icon as any} 
+              size={20} 
+              color="#FFFFFF" 
+            />
+          </View>
           <View>
             <Text style={styles.symbol}>{signal.symbol}</Text>
-            <Text style={styles.type}>{signal.type}</Text>
-          </View>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-          <Text style={styles.statusText}>{getStatusLabel(signal.status)}</Text>
-        </View>
-      </View>
-
-      <View style={styles.content}>
-        <View style={styles.row}>
-          <View style={styles.valueContainer}>
-            <Text style={styles.label}>Entry</Text>
-            <Text style={styles.value}>{signal.entry.toFixed(2)}</Text>
-          </View>
-          <View style={[
-            styles.valueContainer,
-            signal.stopHitPrice && styles.hitBadge,
-            signal.stopHitPrice && { borderColor: '#E74C3C' }
-          ]}>
-            <Text style={styles.label}>Stop Loss</Text>
-            <Text style={[styles.value, { color: '#E74C3C' }]}>
-              {signal.stopLoss.toFixed(2)}
+            <Text style={[styles.type, { color: typeInfo.color }]}>
+              {typeInfo.label}
             </Text>
           </View>
         </View>
-
-        <View style={styles.row}>
-          <View style={[
-            styles.valueContainer,
-            signal.take1HitPrice && styles.hitBadge,
-            signal.take1HitPrice && { borderColor: '#2ECC71' }
-          ]}>
-            <Text style={styles.label}>Take 1</Text>
-            <Text style={[styles.value, { color: '#2ECC71' }]}>
-              {signal.take1.toFixed(2)}
-            </Text>
-          </View>
-          <View style={[
-            styles.valueContainer,
-            signal.take2HitPrice && styles.hitBadge,
-            signal.take2HitPrice && { borderColor: '#2ECC71' }
-          ]}>
-            <Text style={styles.label}>Take 2</Text>
-            <Text style={[styles.value, { color: '#2ECC71' }]}>
-              {signal.take2.toFixed(2)}
-            </Text>
-          </View>
-          <View style={[
-            styles.valueContainer,
-            signal.take3HitPrice && styles.hitBadge,
-            signal.take3HitPrice && { borderColor: '#2ECC71' }
-          ]}>
-            <Text style={styles.label}>Take 3</Text>
-            <Text style={[styles.value, { color: '#2ECC71' }]}>
-              {signal.take3.toFixed(2)}
-            </Text>
+        
+        <View style={styles.statusContainer}>
+          {wasRecentlyUpdated && (
+            <View style={styles.updateIndicator}>
+              <MaterialCommunityIcons name="circle" size={8} color="#f59e0b" />
+              <Text style={styles.updateIndicatorText}>NOVO</Text>
+            </View>
+          )}
+          <View style={[styles.statusBadge, { backgroundColor: statusInfo.color }]}>
+            <MaterialCommunityIcons 
+              name={statusInfo.icon as any} 
+              size={14} 
+              color="#FFFFFF" 
+            />
+            <Text style={styles.statusText}>{statusInfo.label}</Text>
           </View>
         </View>
       </View>
 
+      {/* Linha divisória decorativa */}
+      <View style={styles.divider} />
+
+      {/* Seção Entry e Stop Loss */}
+      <View style={styles.mainPrices}>
+        <View style={[
+          styles.priceBox,
+          wasRecentlyUpdated && styles.priceBoxUpdated,
+        ]}>
+          <View style={styles.priceLabelRow}>
+            <Text style={styles.priceLabel}>Entry</Text>
+            {wasRecentlyUpdated && renderUpdateBadge()}
+          </View>
+          <Text style={styles.priceValue}>{signal.entry.toFixed(2)}</Text>
+        </View>
+
+        <View style={styles.arrowContainer}>
+          <MaterialCommunityIcons name="arrow-right" size={20} color="#4B5563" />
+        </View>
+
+        <View style={[
+          styles.priceBox,
+          hasStopHit && styles.priceBoxHit,
+          hasStopHit && { borderColor: '#ef4444', backgroundColor: '#ef444410' },
+          wasRecentlyUpdated && !hasStopHit && styles.priceBoxUpdated,
+        ]}>
+          <View style={styles.priceLabelRow}>
+            <Text style={styles.priceLabel}>Stop Loss</Text>
+            {wasRecentlyUpdated && !hasStopHit && renderUpdateBadge()}
+          </View>
+          <Text style={[styles.priceValue, { color: '#ef4444' }]}>
+            {signal.stopLoss.toFixed(2)}
+          </Text>
+          {hasStopHit && (
+            <View style={styles.hitIndicator}>
+              <MaterialCommunityIcons name="check" size={12} color="#FFFFFF" />
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* Seção Takes */}
+      <View style={styles.takesSection}>
+        <Text style={styles.takesTitle}>Take Profits</Text>
+        <View style={styles.takesRow}>
+          {[
+            { value: signal.take1, hit: hasTake1Hit, label: 'T1' },
+            { value: signal.take2, hit: hasTake2Hit, label: 'T2' },
+            { value: signal.take3, hit: hasTake3Hit, label: 'T3' },
+          ].map((take, index) => (
+            <View
+              key={index}
+              style={[
+                styles.takeBox,
+                take.hit && styles.takeBoxHit,
+                wasRecentlyUpdated && !take.hit && styles.takeBoxUpdated,
+              ]}
+            >
+              <View style={styles.takeLabelRow}>
+                <Text style={styles.takeLabel}>{take.label}</Text>
+                {wasRecentlyUpdated && !take.hit && (
+                  <View style={styles.updateDot}>
+                    <MaterialCommunityIcons name="circle" size={6} color="#f59e0b" />
+                  </View>
+                )}
+              </View>
+              <Text style={styles.takeValue}>{take.value.toFixed(2)}</Text>
+              {take.hit && (
+                <View style={styles.takeCheckmark}>
+                  <MaterialCommunityIcons name="check-circle" size={16} color="#10b981" />
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Footer: Data/Hora e Nome */}
       <View style={styles.footer}>
-        <Text style={styles.timeText}>{formattedTime}</Text>
-        <Text style={styles.nameText}>{signal.name}</Text>
+        <View style={styles.footerItem}>
+          <MaterialCommunityIcons name="clock-outline" size={14} color="#6B7280" />
+          <Text style={styles.footerText}>{formattedTime}</Text>
+        </View>
+        {signal.name && (
+          <View style={styles.footerItem}>
+            <MaterialCommunityIcons name="account" size={14} color="#6B7280" />
+            <Text style={styles.footerText}>{signal.name}</Text>
+          </View>
+        )}
       </View>
+
+      {/* Indicador global de atualização recente */}
+      {wasRecentlyUpdated && (
+        <View style={styles.recentUpdateOverlay}>
+          <MaterialCommunityIcons name="refresh" size={12} color="#f59e0b" />
+          <Text style={styles.recentUpdateText}>
+            Atualizado há poucos segundos
+          </Text>
+        </View>
+      )}
     </View>
   );
 
   if (onPress) {
     return (
-      <TouchableOpacity activeOpacity={0.7} onPress={() => onPress(signal)}>
+      <TouchableOpacity activeOpacity={0.8} onPress={() => onPress(signal)}>
         {CardContent}
       </TouchableOpacity>
     );
@@ -185,21 +236,32 @@ export const SignalCard: React.FC<SignalCardProps> = ({ signal, onPress }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#1A1F3A',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: '#0f1419',
+    borderRadius: 20,
+    padding: 18,
     marginVertical: 8,
-    marginHorizontal: 16,
+    marginHorizontal: 20,
+    borderWidth: 2,
+    borderColor: '#1a1f2e',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: '#2A2F4A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    position: 'relative',
+  },
+  stopHitCard: {
+    borderColor: '#ef4444',
+    backgroundColor: '#1a0f0f',
+  },
+  takeHitCard: {
+    borderColor: '#10b981',
+    backgroundColor: '#0f1a14',
+  },
+  recentlyUpdatedCard: {
+    borderColor: '#f59e0b',
+    shadowColor: '#f59e0b',
+    shadowOpacity: 0.5,
   },
   header: {
     flexDirection: 'row',
@@ -207,78 +269,234 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  symbolContainer: {
+  symbolSection: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  emoji: {
-    fontSize: 32,
+  typeIndicator: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   symbol: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   type: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    textTransform: 'uppercase',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  statusContainer: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  updateIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#f59e0b20',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  updateIndicatorText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#f59e0b',
+    letterSpacing: 0.5,
   },
   statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    gap: 5,
   },
   statusText: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+    fontSize: 11,
+    fontWeight: 'bold',
+    letterSpacing: 0.3,
   },
-  content: {
-    gap: 12,
+  divider: {
+    height: 1,
+    backgroundColor: '#1a1f2e',
     marginBottom: 16,
   },
-  row: {
+  mainPrices: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    marginBottom: 18,
   },
-  valueContainer: {
+  priceBox: {
     flex: 1,
-  },
-  hitBadge: {
+    backgroundColor: '#1a1f2e',
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 2,
-    borderRadius: 8,
-    padding: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: 'transparent',
+    position: 'relative',
   },
-  label: {
-    fontSize: 12,
-    color: '#9CA3AF',
+  priceBoxHit: {
+    borderWidth: 2,
+  },
+  priceBoxUpdated: {
+    borderColor: '#f59e0b30',
+    backgroundColor: '#f59e0b10',
+  },
+  priceLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 4,
   },
-  value: {
+  priceLabel: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  priceValue: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  updateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  updateBadgeText: {
+    fontSize: 7,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  hitIndicator: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  arrowContainer: {
+    paddingHorizontal: 8,
+  },
+  takesSection: {
+    marginBottom: 16,
+  },
+  takesTitle: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginBottom: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  takesRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  takeBox: {
+    flex: 1,
+    backgroundColor: '#1a1f2e',
+    borderRadius: 10,
+    padding: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    position: 'relative',
+  },
+  takeBoxHit: {
+    borderColor: '#10b981',
+    backgroundColor: '#10b98110',
+  },
+  takeBoxUpdated: {
+    borderColor: '#f59e0b30',
+    backgroundColor: '#f59e0b10',
+  },
+  takeLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  takeLabel: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  updateDot: {
+    width: 8,
+    height: 8,
+  },
+  takeValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#10b981',
+    letterSpacing: 0.2,
+  },
+  takeCheckmark: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
+    paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: '#2A2F4A',
+    borderTopColor: '#1a1f2e',
   },
-  timeText: {
-    fontSize: 12,
-    color: '#6B7280',
+  footerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  nameText: {
-    fontSize: 12,
+  footerText: {
+    fontSize: 11,
     color: '#6B7280',
     fontWeight: '500',
+  },
+  recentUpdateOverlay: {
+    position: 'absolute',
+    bottom: -1,
+    left: 0,
+    right: 0,
+    backgroundColor: '#f59e0b20',
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#f59e0b30',
+  },
+  recentUpdateText: {
+    fontSize: 10,
+    color: '#f59e0b',
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
 });

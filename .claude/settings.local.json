@@ -18,7 +18,11 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(dir /b /s src*.html 2)",
-      "Bash(nul)"
+      "Bash(nul)",
+      "Bash(eas credentials:*)",
+      "WebFetch(domain:job-logs.eascdn.net)",
+      "Bash(findstr:*)",
+      "Bash(dir /b mobilegoogle-services.json 2)"
     ],
     "deny": [],
     "ask": []

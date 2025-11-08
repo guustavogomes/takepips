@@ -46,7 +46,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: '#FFD700',
         tabBarInactiveTintColor: '#6B7280',
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '600',
           marginTop: 2,
         },
@@ -68,19 +68,11 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* Educação - E-books */}
+      {/* Educação - E-books (Desabilitado temporariamente) */}
       <Tabs.Screen
         name="education"
         options={{
-          title: 'Educação',
-          headerTitle: '📚 Aprenda Forex',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'book' : 'book-outline'}
-              size={24}
-              color={color}
-            />
-          ),
+          href: null, // Esconde da navegação
         }}
       />
 
@@ -101,26 +93,18 @@ export default function TabsLayout() {
             marginTop: -5,
           },
           tabBarLabelStyle: {
-            fontSize: 12,
+            fontSize: 10,
             fontWeight: 'bold',
             marginTop: 0,
           },
         }}
       />
 
-      {/* Ferramentas */}
+      {/* Ferramentas (Desabilitado temporariamente) */}
       <Tabs.Screen
         name="tools"
         options={{
-          title: 'Ferramentas',
-          headerTitle: '🛠️ Ferramentas',
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              name={focused ? 'toolbox' : 'toolbox-outline'}
-              size={24}
-              color={color}
-            />
-          ),
+          href: null, // Esconde da navegação
         }}
       />
 

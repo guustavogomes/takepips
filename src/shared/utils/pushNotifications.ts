@@ -263,7 +263,19 @@ export async function sendPushNotification(
         title,
         body,
         data: data || {},
-        priority: 'high',
+        priority: 'high', // Alta prioridade para notificações mesmo com app fechado
+        channelId: 'default', // Usa o canal configurado no app (importance: 5 - MAX)
+        // Configurações Android específicas para app fechado
+        android: {
+          priority: 'max', // Prioridade máxima no Android
+          sound: 'default',
+          channelId: 'default',
+        },
+        // Configurações iOS
+        ios: {
+          sound: 'default',
+          _displayInForeground: true,
+        },
       }));
 
       console.log('[PUSH] Mensagens preparadas:', JSON.stringify(messages, null, 2));
@@ -467,5 +479,32 @@ export async function notifySignalDataUpdate(
   });
 
   console.log('[PUSH] notifySignalDataUpdate concluído');
+}
+
+/**
+ * Enviar notificação quando um sinal é cancelado manualmente
+ */
+export async function notifySignalCancelled(
+  signalType: 'BUY' | 'SELL',
+  symbol: string,
+  reason?: string
+): Promise<void> {
+  console.log('[PUSH] notifySignalCancelled chamado:', { signalType, symbol, reason });
+  
+  const emoji = '❌';
+  const title = `${emoji} Sinal ${signalType} Cancelado - ${symbol}`;
+  const body = reason || 'O sinal foi cancelado manualmente';
+
+  console.log('[PUSH] Preparando notificação de cancelamento:', { title, body });
+
+  await sendPushNotification(title, body, {
+    signalType,
+    symbol,
+    event: 'SIGNAL_CANCELLED',
+    reason,
+    timestamp: new Date().toISOString(),
+  });
+
+  console.log('[PUSH] notifySignalCancelled concluído');
 }
 

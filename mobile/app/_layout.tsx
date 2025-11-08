@@ -30,6 +30,12 @@ function RootLayoutContent() {
   const [appIsReady, setAppIsReady] = useState(false);
   const router = useRouter();
 
+  // Log para confirmar que o componente está sendo renderizado
+  useEffect(() => {
+    console.log('[RootLayout] ✅ RootLayoutContent renderizado');
+    console.log('[RootLayout] Hook usePushNotifications será chamado agora...');
+  }, []);
+
   // Registrar push notifications automaticamente
   usePushNotifications();
 

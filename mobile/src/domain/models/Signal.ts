@@ -6,7 +6,7 @@
  */
 
 export type SignalType = 'BUY' | 'SELL';
-export type SignalStatus = 'PENDING' | 'EM_OPERACAO' | 'STOP_LOSS' | 'TAKE1' | 'TAKE2' | 'TAKE3' | 'ENCERRADO';
+export type SignalStatus = 'PENDING' | 'EM_OPERACAO' | 'STOP_LOSS' | 'TAKE1' | 'TAKE2' | 'TAKE3' | 'ENCERRADO' | 'CANCELADO';
 
 export interface Signal {
   id: string;

@@ -1,15 +1,12 @@
 /**
  * Stats Dashboard Component
  *
- * Exibe estatísticas de performance dos sinais
- * - Pips de hoje
- * - Pips últimos 30 dias
- * - Pips últimos 90 dias
+ * Dashboard de estatísticas com design moderno e legível
  */
 
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 
 interface SignalStats {
@@ -50,60 +47,71 @@ export function StatsDashboard() {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="small" color="#FFD700" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FFD700" />
+        <Text style={styles.loadingText}>Carregando estatísticas...</Text>
       </View>
     );
   }
 
   if (error || !stats) {
-    return null; // Não mostra nada se der erro
+    return null;
   }
 
   const renderStatCard = (
     title: string,
     stat: SignalStats,
-    icon: keyof typeof Ionicons.glyphMap,
-    color: string
+    icon: string,
+    accentColor: string
   ) => {
     const isPositive = stat.totalPips >= 0;
 
     return (
-      <View style={[styles.statCard, { borderLeftColor: color }]}>
-        <View style={styles.statHeader}>
-          <Ionicons name={icon} size={18} color={color} />
-          <Text style={styles.statTitle}>{title}</Text>
+      <View style={[styles.statCard, { borderColor: accentColor }]}>
+        {/* Header com ícone e título */}
+        <View style={styles.cardHeader}>
+          <MaterialCommunityIcons name={icon as any} size={22} color={accentColor} />
+          <Text style={styles.cardTitle}>{title}</Text>
         </View>
 
-        <View style={styles.statBody}>
+        {/* Pips principais */}
+        <View style={styles.pipsContainer}>
           <Text
             style={[
-              styles.statPips,
+              styles.pipsValue,
               { color: isPositive ? '#10b981' : '#ef4444' },
             ]}
           >
             {isPositive ? '+' : ''}
             {stat.totalPips.toFixed(1)}
           </Text>
-          <Text style={styles.statPipsLabel}>pips</Text>
+          <Text style={styles.pipsLabel}>pips</Text>
         </View>
 
-        <View style={styles.statFooter}>
-          <View style={styles.statMetric}>
-            <Text style={styles.statMetricLabel}>Taxa</Text>
-            <Text style={styles.statMetricValue}>{stat.winRate.toFixed(0)}%</Text>
+        {/* Métricas secundárias */}
+        <View style={styles.metricsRow}>
+          <View style={styles.metric}>
+            <Text style={styles.metricLabel}>Taxa Sinais</Text>
+            <View style={styles.metricValueRow}>
+              <Text style={[styles.metricValue, { color: accentColor }]}>
+                {stat.winRate.toFixed(0)}%
+              </Text>
+              <Text style={styles.metricSeparator}>•</Text>
+              <Text style={styles.metricSecondary}>{stat.totalSignals}</Text>
+            </View>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statMetric}>
-            <Text style={styles.statMetricLabel}>Sinais</Text>
-            <Text style={styles.statMetricValue}>{stat.totalSignals}</Text>
+        </View>
+
+        {/* W/L em destaque */}
+        <View style={styles.wlContainer}>
+          <View style={styles.wlItem}>
+            <Text style={[styles.wlValue, { color: '#10b981' }]}>{stat.wins}</Text>
+            <Text style={styles.wlLabel}>W</Text>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statMetric}>
-            <Text style={styles.statMetricLabel}>W/L</Text>
-            <Text style={styles.statMetricValue}>
-              {stat.wins}/{stat.losses}
-            </Text>
+          <View style={styles.wlDivider} />
+          <View style={styles.wlItem}>
+            <Text style={[styles.wlValue, { color: '#ef4444' }]}>{stat.losses}</Text>
+            <Text style={styles.wlLabel}>L</Text>
           </View>
         </View>
       </View>
@@ -112,15 +120,17 @@ export function StatsDashboard() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Ionicons name="stats-chart" size={20} color="#FFD700" />
-        <Text style={styles.headerTitle}>Performance</Text>
+      {/* Header da seção */}
+      <View style={styles.sectionHeader}>
+        <MaterialCommunityIcons name="chart-line" size={24} color="#FFD700" />
+        <Text style={styles.sectionTitle}>Performance</Text>
       </View>
 
+      {/* Grid de estatísticas */}
       <View style={styles.statsGrid}>
-        {renderStatCard('Hoje', stats.today, 'today', '#FFD700')}
-        {renderStatCard('30 Dias', stats.last30Days, 'calendar', '#6366f1')}
-        {renderStatCard('90 Dias', stats.last90Days, 'trending-up', '#10b981')}
+        {renderStatCard('Hoje', stats.today, 'calendar-today', '#FFD700')}
+        {renderStatCard('30 Dias', stats.last30Days, 'calendar-month', '#6366f1')}
+        {renderStatCard('90 Dias', stats.last90Days, 'chart-timeline-variant', '#10b981')}
       </View>
     </View>
   );
@@ -128,80 +138,131 @@ export function StatsDashboard() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#0A0E27',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
-  header: {
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    color: '#9CA3AF',
+    fontSize: 14,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
+    marginBottom: 16,
+    gap: 10,
   },
-  headerTitle: {
-    fontSize: 16,
+  sectionTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
   statsGrid: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
   },
   statCard: {
     flex: 1,
     backgroundColor: '#0f1419',
-    borderRadius: 12,
-    padding: 12,
-    borderLeftWidth: 3,
-    borderColor: '#1a1f2e',
-    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  statHeader: {
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    gap: 6,
+    marginBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  pipsContainer: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  pipsValue: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    letterSpacing: -0.5,
+  },
+  pipsLabel: {
+    fontSize: 10,
+    color: '#6B7280',
+    marginTop: -2,
+    fontWeight: '600',
+  },
+  metricsRow: {
+    marginBottom: 10,
+  },
+  metric: {
+    alignItems: 'center',
+  },
+  metricLabel: {
+    fontSize: 9,
+    color: '#6B7280',
+    marginBottom: 4,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  metricValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
   },
-  statTitle: {
-    fontSize: 11,
+  metricValue: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  metricSeparator: {
+    fontSize: 10,
+    color: '#4B5563',
+  },
+  metricSecondary: {
+    fontSize: 13,
     color: '#9CA3AF',
     fontWeight: '600',
   },
-  statBody: {
+  wlContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#1a1f2e',
+    borderRadius: 8,
+    padding: 8,
     alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'center',
   },
-  statPips: {
-    fontSize: 24,
+  wlItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  wlValue: {
+    fontSize: 14,
     fontWeight: 'bold',
   },
-  statPipsLabel: {
-    fontSize: 10,
-    color: '#6B7280',
-    marginTop: -4,
-  },
-  statFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#1a1f2e',
-  },
-  statMetric: {
-    alignItems: 'center',
-  },
-  statMetricLabel: {
+  wlLabel: {
     fontSize: 9,
     color: '#6B7280',
-    marginBottom: 2,
+    fontWeight: '700',
   },
-  statMetricValue: {
-    fontSize: 11,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  statDivider: {
+  wlDivider: {
     width: 1,
-    backgroundColor: '#1a1f2e',
+    height: 24,
+    backgroundColor: '#374151',
   },
 });

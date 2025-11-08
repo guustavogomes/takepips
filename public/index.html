@@ -536,6 +536,18 @@
             height: 6px;
         }
 
+        /* Cards cancelados - fundo roxo/desativado */
+        .signal-card.status-cancelado {
+            background: linear-gradient(135deg, rgba(147, 51, 234, 0.15) 0%, rgba(147, 51, 234, 0.05) 100%);
+            border-color: rgba(147, 51, 234, 0.5);
+            opacity: 0.8;
+        }
+
+        .signal-card.status-cancelado::before {
+            background: #9333ea;
+            height: 6px;
+        }
+
         .signal-card:hover {
             transform: translateY(-8px) scale(1.02);
             border-color: var(--primary-color);
@@ -1149,7 +1161,9 @@
                 'TAKE3': 'Take 3',
                 'take3': 'Take 3',
                 'ENCERRADO': 'Encerrado',
-                'encerrado': 'Encerrado'
+                'encerrado': 'Encerrado',
+                'CANCELADO': 'Cancelado',
+                'cancelado': 'Cancelado'
             };
             
             return statusMap[status.toUpperCase()] || statusMap[status] || status;

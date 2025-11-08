@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "975335393207",
+    "project_id": "taketips-1e317",
+    "storage_bucket": "taketips-1e317.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:975335393207:android:37a0baf281aa6d0df78a32",
+        "android_client_info": {
+          "package_name": "com.takepips.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCOGpaL0sgGUQ6GscGozKxTCdsMYrfYH_g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
