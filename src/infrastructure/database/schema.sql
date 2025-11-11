@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS signals (
   take3 DECIMAL(20, 5) NOT NULL,
   stop_ticks INTEGER NOT NULL,
   time TIMESTAMP WITH TIME ZONE NOT NULL,
+  sessao VARCHAR(50),
   status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'EM_OPERACAO', 'STOP_LOSS', 'TAKE1', 'TAKE2', 'TAKE3', 'ENCERRADO')),
   stop_hit_at TIMESTAMP WITH TIME ZONE,
   take1_hit_at TIMESTAMP WITH TIME ZONE,
@@ -36,4 +37,8 @@ CREATE INDEX IF NOT EXISTS idx_signals_symbol_time ON signals(symbol, time DESC)
 -- Índices para rastreamento de status
 CREATE INDEX IF NOT EXISTS idx_signals_status ON signals(status);
 CREATE INDEX IF NOT EXISTS idx_signals_pending ON signals(status) WHERE status = 'PENDING';
+
+-- Índice para análise estatística por sessão
+CREATE INDEX IF NOT EXISTS idx_signals_sessao ON signals(sessao);
+CREATE INDEX IF NOT EXISTS idx_signals_sessao_status ON signals(sessao, status);
 

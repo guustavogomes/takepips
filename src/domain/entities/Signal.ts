@@ -13,6 +13,7 @@ export interface Signal {
   take3: number;
   stopTicks: number;
   time: Date;
+  sessao?: string;
   status: SignalStatus;
   stopHitAt?: Date;
   take1HitAt?: Date;
@@ -37,5 +38,6 @@ export interface CreateSignalData {
   take3: number;
   stopTicks: number;
   time: string; // Formato: "YYYY.MM.DD HH:MM:SS"
+  sessao?: string;
 }
 

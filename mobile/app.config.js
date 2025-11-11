@@ -38,7 +38,8 @@ export default {
         'WAKE_LOCK', // Permite acordar o dispositivo para notificações
       ],
       // Arquivo de configuração do Firebase para Android
-      googleServicesFile: './google-services.json',
+      // Usa variável de ambiente no EAS Build, fallback para arquivo local
+      googleServicesFile: process.env.GOOGLE_SERVICES_JSON || './google-services.json',
       useNextNotificationsApi: true, // Usa a API mais recente de notificações
     },
     web: {
