@@ -32,7 +32,17 @@ export class SignalRepository implements ISignalRepository {
         return [];
       }
 
-      return response.data.map(signalFromDTO);
+      // Filtrar apenas sinais dos últimos 5 dias
+      const fiveDaysAgo = new Date();
+      fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+      fiveDaysAgo.setHours(0, 0, 0, 0); // Início do dia há 5 dias
+
+      const filteredSignals = response.data.filter((signal) => {
+        const signalDate = new Date(signal.createdAt);
+        return signalDate >= fiveDaysAgo;
+      });
+
+      return filteredSignals.map(signalFromDTO);
     } catch (error) {
       console.error('[SignalRepository] Error fetching signals:', error);
       // Retornar array vazio em caso de erro para não quebrar a UI

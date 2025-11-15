@@ -22,7 +22,14 @@
       "Bash(eas credentials:*)",
       "WebFetch(domain:job-logs.eascdn.net)",
       "Bash(findstr:*)",
-      "Bash(dir /b mobilegoogle-services.json 2)"
+      "Bash(dir /b mobilegoogle-services.json 2)",
+      "Bash(dir /b /s *.json 2)",
+      "Bash(where:*)",
+      "Bash(dir:*)",
+      "WebFetch(domain:docs.expo.dev)",
+      "Bash(copy /Y AlphaGains.mq5 AlphaGains_EA_BACKUP.mq5)",
+      "Bash(copy /Y \"C:\\Projetos\\takepips\\indicador\\AlphaGains_EA.mq5\" \"C:\\Projetos\\takepips\\indicador\\AlphaGains_EA_BACKUP.mq5\")",
+      "Bash(cmd /c copy /Y \"C:\\Projetos\\takepips\\indicador\\AlphaGains_EA.mq5\" \"C:\\Projetos\\takepips\\indicador\\AlphaGains_EA_BACKUP.mq5\")"
     ],
     "deny": [],
     "ask": []

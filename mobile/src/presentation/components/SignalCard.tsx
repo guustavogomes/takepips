@@ -1,15 +1,24 @@
 /**
  * Presentation Layer - Signal Card Component
- * 
+ *
  * Card de sinal com design moderno e indicadores de atualização
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Signal, SignalStatus } from '@/domain/models/Signal';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+// Função para escalar fontes baseado no tamanho da tela
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const scale = SCREEN_WIDTH / 375; // 375 é a largura de referência (iPhone X)
+
+function normalize(size: number): number {
+  const newSize = size * scale;
+  return Math.round(newSize);
+}
 
 interface SignalCardProps {
   signal: Signal;
@@ -110,12 +119,18 @@ export const SignalCard: React.FC<SignalCardProps> = ({ signal, onPress }) => {
             </View>
           )}
           <View style={[styles.statusBadge, { backgroundColor: statusInfo.color }]}>
-            <MaterialCommunityIcons 
-              name={statusInfo.icon as any} 
-              size={14} 
-              color="#FFFFFF" 
+            <MaterialCommunityIcons
+              name={statusInfo.icon as any}
+              size={normalize(14)}
+              color="#FFFFFF"
             />
-            <Text style={styles.statusText}>{statusInfo.label}</Text>
+            <Text
+              style={styles.statusText}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {statusInfo.label}
+            </Text>
           </View>
         </View>
       </View>
@@ -199,14 +214,26 @@ export const SignalCard: React.FC<SignalCardProps> = ({ signal, onPress }) => {
 
       {/* Footer: Data/Hora e Nome */}
       <View style={styles.footer}>
-        <View style={styles.footerItem}>
-          <MaterialCommunityIcons name="clock-outline" size={14} color="#6B7280" />
-          <Text style={styles.footerText}>{formattedTime}</Text>
+        <View style={[styles.footerItem, { flex: 1, marginRight: 8 }]}>
+          <MaterialCommunityIcons name="clock-outline" size={normalize(14)} color="#6B7280" />
+          <Text
+            style={styles.footerText}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {formattedTime}
+          </Text>
         </View>
         {signal.name && (
-          <View style={styles.footerItem}>
-            <MaterialCommunityIcons name="account" size={14} color="#6B7280" />
-            <Text style={styles.footerText}>{signal.name}</Text>
+          <View style={[styles.footerItem, { flex: 1 }]}>
+            <MaterialCommunityIcons name="account" size={normalize(14)} color="#6B7280" />
+            <Text
+              style={styles.footerText}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {signal.name}
+            </Text>
           </View>
         )}
       </View>
@@ -282,19 +309,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   symbol: {
-    fontSize: 22,
+    fontSize: normalize(22),
     fontWeight: 'bold',
     color: '#FFFFFF',
     letterSpacing: 0.5,
   },
   type: {
-    fontSize: 12,
+    fontSize: normalize(12),
     fontWeight: '700',
     letterSpacing: 0.5,
   },
   statusContainer: {
     alignItems: 'flex-end',
     gap: 6,
+    flexShrink: 1,
+    maxWidth: '50%',
   },
   updateIndicator: {
     flexDirection: 'row',
@@ -306,7 +335,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   updateIndicatorText: {
-    fontSize: 9,
+    fontSize: normalize(9),
     fontWeight: 'bold',
     color: '#f59e0b',
     letterSpacing: 0.5,
@@ -318,12 +347,14 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 10,
     gap: 5,
+    maxWidth: '100%',
   },
   statusText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: normalize(11),
     fontWeight: 'bold',
     letterSpacing: 0.3,
+    flexShrink: 1,
   },
   divider: {
     height: 1,
@@ -359,14 +390,14 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   priceLabel: {
-    fontSize: 11,
+    fontSize: normalize(11),
     color: '#9CA3AF',
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   priceValue: {
-    fontSize: 18,
+    fontSize: normalize(18),
     fontWeight: 'bold',
     color: '#FFFFFF',
     letterSpacing: 0.3,
@@ -381,7 +412,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   updateBadgeText: {
-    fontSize: 7,
+    fontSize: normalize(7),
     fontWeight: 'bold',
     color: '#FFFFFF',
     letterSpacing: 0.3,
@@ -404,7 +435,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   takesTitle: {
-    fontSize: 12,
+    fontSize: normalize(12),
     color: '#9CA3AF',
     marginBottom: 10,
     fontWeight: '600',
@@ -440,7 +471,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   takeLabel: {
-    fontSize: 10,
+    fontSize: normalize(10),
     color: '#9CA3AF',
     fontWeight: '700',
     letterSpacing: 0.3,
@@ -450,7 +481,7 @@ const styles = StyleSheet.create({
     height: 8,
   },
   takeValue: {
-    fontSize: 14,
+    fontSize: normalize(14),
     fontWeight: 'bold',
     color: '#10b981',
     letterSpacing: 0.2,
@@ -466,16 +497,19 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: '#1a1f2e',
+    gap: 8,
   },
   footerItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexShrink: 1,
   },
   footerText: {
-    fontSize: 11,
+    fontSize: normalize(11),
     color: '#6B7280',
     fontWeight: '500',
+    flexShrink: 1,
   },
   recentUpdateOverlay: {
     position: 'absolute',
@@ -494,7 +528,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#f59e0b30',
   },
   recentUpdateText: {
-    fontSize: 10,
+    fontSize: normalize(10),
     color: '#f59e0b',
     fontWeight: '600',
     letterSpacing: 0.3,

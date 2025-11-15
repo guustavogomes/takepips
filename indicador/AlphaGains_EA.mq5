@@ -15,7 +15,7 @@
 //============================
 input group "Trading Automático"
 input string EndpointURL = "https://takepips.vercel.app/api/signals";
-input bool   AutoSendSignals = true;
+input bool   AutoSendSignals = false;  // ⚠️ DESABILITADO: Use os botões BUY/SELL para enviar sinais manualmente
 input bool   TestConnectionOnStart = false;
 input bool   SendTestSignalOnStart = false;
 
@@ -166,6 +166,8 @@ struct SignalData
     string sessionName;
     string status; // PENDING, EM_OPERACAO, etc
     double znTriggerPrice; // Preço da ZN que aciona o sinal
+    string sessionPrefix; // Prefixo da sessão para deletar objetos
+    long diaUnicoID; // ID único do dia para identificar linhas
 };
 
 //============================
@@ -223,9 +225,11 @@ void SendManualSellSignal();
 void CheckPendingSignalActivation();
 void MonitorPriceLevels();
 bool UpdateSignalStatus(string signalId, string status, double preco_saida);
+bool UpdateSignalEntry(string signalId, double newEntry);
 void EncerrarSinal(string signalId);
 void CreateButtons();
 void CheckZNBreakout();
+void UpdateSignalFromZNMovement();
 
 //============================
 // OnInit
@@ -567,25 +571,94 @@ void DeleteObjectsByPrefix(string prefix)
 void CriarLinhaPersonalizada(string nome, datetime t1, double p1, datetime t2, double p2, color cor, ENUM_LINE_STYLE estilo, int espessura, bool raio=false)
 {
     string fullName = INDICATOR_PREFIX + nome;
-    if(ObjectFind(0, fullName) < 0)
+    bool isZNLine = (StringFind(nome, "REPL_UP") >= 0 || StringFind(nome, "REPL_DOWN") >= 0);
+    
+    // Verificar se o objeto já existe
+    bool objectExists = (ObjectFind(0, fullName) >= 0);
+    
+    // Linhas ZN usam OBJ_HLINE (horizontal) para facilitar o movimento
+    // Outras linhas usam OBJ_TREND
+    if(!objectExists)
     {
-        if(!ObjectCreate(0, fullName, OBJ_TREND, 0, t1, p1, t2, p2))
+        if(isZNLine)
         {
-            Print("🔴 Falha ao criar objeto ", fullName, ": ", GetLastError());
-            return;
+            // Criar linha horizontal (mais fácil de arrastar)
+            if(!ObjectCreate(0, fullName, OBJ_HLINE, 0, 0, p1))
+            {
+                Print("🔴 Falha ao criar ZN ", fullName, ": ", GetLastError());
+                return;
+            }
+            Print("✏️ Linha ZN criada como EDITÁVEL: ", fullName, " @ ", p1);
+        }
+        else
+        {
+            // Criar linha de tendência normal
+            if(!ObjectCreate(0, fullName, OBJ_TREND, 0, t1, p1, t2, p2))
+            {
+                Print("🔴 Falha ao criar objeto ", fullName, ": ", GetLastError());
+                return;
+            }
+        }
+        
+        // Configurar propriedades APENAS na criação (não repetir a cada tick)
+        ObjectSetInteger(0, fullName, OBJPROP_COLOR, cor);
+        ObjectSetInteger(0, fullName, OBJPROP_STYLE, estilo);
+        ObjectSetInteger(0, fullName, OBJPROP_WIDTH, espessura);
+        
+        // Linhas ZN são SELECIONÁVEIS e EDITÁVEIS para ajuste manual
+        if(isZNLine)
+        {
+            ObjectSetInteger(0, fullName, OBJPROP_SELECTABLE, true);
+            ObjectSetInteger(0, fullName, OBJPROP_BACK, false); // Frente para facilitar seleção
+            ObjectSetInteger(0, fullName, OBJPROP_ZORDER, 0); // Prioridade de seleção
+        }
+        else
+        {
+            ObjectSetInteger(0, fullName, OBJPROP_SELECTABLE, false);
+            ObjectSetInteger(0, fullName, OBJPROP_BACK, false);
+            ObjectSetInteger(0, fullName, OBJPROP_RAY, raio);
         }
     }
-    ObjectSetInteger(0, fullName, OBJPROP_COLOR, cor);
-    ObjectSetInteger(0, fullName, OBJPROP_STYLE, estilo);
-    ObjectSetInteger(0, fullName, OBJPROP_WIDTH, espessura);
-    ObjectSetInteger(0, fullName, OBJPROP_RAY, raio);
-    ObjectSetInteger(0, fullName, OBJPROP_SELECTABLE, false);
-    ObjectSetInteger(0, fullName, OBJPROP_BACK, false);
+    // Se o objeto já existe, não fazer nada (deixar o usuário mover se quiser)
 }
 
 void AdicionarTextoPersonalizado(string nome, datetime tempo, double preco, string texto, color cor, int fontSize, int anchor)
 {
     string fullName = INDICATOR_PREFIX + nome;
+    bool isZNLabel = (StringFind(nome, "LABEL_UP") >= 0 || StringFind(nome, "LABEL_DOWN") >= 0);
+    
+    // Labels de ZN precisam atualizar a posição quando a linha é movida
+    if(isZNLabel && ObjectFind(0, fullName) >= 0)
+    {
+        // Se é label de ZN e já existe, atualizar a posição baseada na linha
+        string lineName = "";
+        if(StringFind(nome, "LABEL_UP") >= 0)
+        {
+            StringReplace(nome, "LABEL_UP", "REPL_UP");
+            lineName = INDICATOR_PREFIX + nome;
+        }
+        else if(StringFind(nome, "LABEL_DOWN") >= 0)
+        {
+            StringReplace(nome, "LABEL_DOWN", "REPL_DOWN");
+            lineName = INDICATOR_PREFIX + nome;
+        }
+        
+        // Ler preço atual da linha ZN
+        if(ObjectFind(0, lineName) >= 0)
+        {
+            double linePrice = ObjectGetDouble(0, lineName, OBJPROP_PRICE, 0);
+            double offset = TextVerticalOffsetPips * _Point;
+            
+            // Ajustar posição do label baseado na linha
+            if(StringFind(nome, "UP") >= 0)
+                ObjectSetDouble(0, fullName, OBJPROP_PRICE, 0, linePrice + offset);
+            else
+                ObjectSetDouble(0, fullName, OBJPROP_PRICE, 0, linePrice - offset);
+            
+            return; // Não recriar
+        }
+    }
+    
     if(ObjectFind(0, fullName) < 0)
     {
         if(!ObjectCreate(0, fullName, OBJ_TEXT, 0, tempo, preco))
@@ -977,23 +1050,46 @@ void SendManualBuySignal()
     signal.timestamp = TimeCurrent();
     signal.active = true;
     signal.status = "PENDING"; // Inicia como PENDING
+    
+    // Armazenar informações da sessão para poder deletar linhas depois
+    signal.sessionPrefix = activeZNs[activeZNIndex].sessionPrefix;
+    MqlDateTime tm_inicio;
+    TimeToStruct(activeZNs[activeZNIndex].startTime, tm_inicio);
+    signal.diaUnicoID = (long)tm_inicio.year*10000000000 + (long)tm_inicio.mon*100000000 +
+                        (long)tm_inicio.day*1000000 + (long)tm_inicio.hour*10000 +
+                        (long)tm_inicio.min*100 + (long)tm_inicio.sec;
 
     double rangeHeight = activeZNs[activeZNIndex].crTopPrice - activeZNs[activeZNIndex].crBottomPrice;
+    
+    // 🔍 LER A POSIÇÃO ATUAL DA ZN DO GRÁFICO (usuário pode ter movido!)
+    string znLineNameUp = INDICATOR_PREFIX + activeZNs[activeZNIndex].sessionPrefix + "REPL_UP_1" + IntegerToString((int)signal.diaUnicoID);
+    double znUpPriceFromChart = activeZNs[activeZNIndex].znUpPrice; // Valor padrão
+    
+    if(ObjectFind(0, znLineNameUp) >= 0)
+    {
+        znUpPriceFromChart = ObjectGetDouble(0, znLineNameUp, OBJPROP_PRICE, 0);
+        if(MathAbs(znUpPriceFromChart - activeZNs[activeZNIndex].znUpPrice) > (_Point * 10))
+        {
+            Print("📍 ZN de COMPRA foi movida pelo usuário!");
+            Print("   Posição original: ", activeZNs[activeZNIndex].znUpPrice);
+            Print("   Posição atual: ", znUpPriceFromChart);
+        }
+    }
 
     if(isFirstOrder)
     {
         // 1º SINAL - COMPRA
-        // Entrada: ZN Compra + 200 pontos
-        signal.preco_entrada = activeZNs[activeZNIndex].znUpPrice + (200 * _Point);
-        // Stop: CR Fundo + 200 pontos
-        signal.stop_loss = activeZNs[activeZNIndex].crBottomPrice + (200 * _Point);
-        // ZN de acionamento: ZN Compra (candle deve fechar ACIMA para acionar)
-        signal.znTriggerPrice = activeZNs[activeZNIndex].znUpPrice;
+        // Entrada: ZN Compra (posição atual no gráfico) + 200 pontos
+        signal.preco_entrada = znUpPriceFromChart + (200 * _Point);
+        // Stop: CR Fundo - 200 pontos
+        signal.stop_loss = activeZNs[activeZNIndex].crBottomPrice - (200 * _Point);
+        // ZN de acionamento: ZN Compra (posição atual)
+        signal.znTriggerPrice = znUpPriceFromChart;
 
         Print("🟢 1º SINAL - COMPRA (PENDING)");
         Print("   ZN Acionamento: ", signal.znTriggerPrice);
         Print("   Entrada: ZN Compra + 200 = ", signal.preco_entrada);
-        Print("   Stop: CR Fundo + 200 = ", signal.stop_loss);
+        Print("   Stop: CR Fundo - 200 = ", signal.stop_loss);
 
         // Marca como primeira ordem
         activeZNs[activeZNIndex].firstManualSignalType = "COMPRA";
@@ -1096,23 +1192,46 @@ void SendManualSellSignal()
     signal.timestamp = TimeCurrent();
     signal.active = true;
     signal.status = "PENDING"; // Inicia como PENDING
+    
+    // Armazenar informações da sessão para poder deletar linhas depois
+    signal.sessionPrefix = activeZNs[activeZNIndex].sessionPrefix;
+    MqlDateTime tm_inicio;
+    TimeToStruct(activeZNs[activeZNIndex].startTime, tm_inicio);
+    signal.diaUnicoID = (long)tm_inicio.year*10000000000 + (long)tm_inicio.mon*100000000 +
+                        (long)tm_inicio.day*1000000 + (long)tm_inicio.hour*10000 +
+                        (long)tm_inicio.min*100 + (long)tm_inicio.sec;
 
     double rangeHeight = activeZNs[activeZNIndex].crTopPrice - activeZNs[activeZNIndex].crBottomPrice;
+    
+    // 🔍 LER A POSIÇÃO ATUAL DA ZN DO GRÁFICO (usuário pode ter movido!)
+    string znLineNameDown = INDICATOR_PREFIX + activeZNs[activeZNIndex].sessionPrefix + "REPL_DOWN_1" + IntegerToString((int)signal.diaUnicoID);
+    double znDownPriceFromChart = activeZNs[activeZNIndex].znDownPrice; // Valor padrão
+    
+    if(ObjectFind(0, znLineNameDown) >= 0)
+    {
+        znDownPriceFromChart = ObjectGetDouble(0, znLineNameDown, OBJPROP_PRICE, 0);
+        if(MathAbs(znDownPriceFromChart - activeZNs[activeZNIndex].znDownPrice) > (_Point * 10))
+        {
+            Print("📍 ZN de VENDA foi movida pelo usuário!");
+            Print("   Posição original: ", activeZNs[activeZNIndex].znDownPrice);
+            Print("   Posição atual: ", znDownPriceFromChart);
+        }
+    }
 
     if(isFirstOrder)
     {
         // 1º SINAL - VENDA
-        // Entrada: ZN Venda - 200 pontos
-        signal.preco_entrada = activeZNs[activeZNIndex].znDownPrice - (200 * _Point);
-        // Stop: CR Topo - 200 pontos
-        signal.stop_loss = activeZNs[activeZNIndex].crTopPrice - (200 * _Point);
-        // ZN de acionamento: ZN Venda (candle deve fechar ABAIXO para acionar)
-        signal.znTriggerPrice = activeZNs[activeZNIndex].znDownPrice;
+        // Entrada: ZN Venda (posição atual no gráfico) - 200 pontos
+        signal.preco_entrada = znDownPriceFromChart - (200 * _Point);
+        // Stop: CR Topo + 200 pontos
+        signal.stop_loss = activeZNs[activeZNIndex].crTopPrice + (200 * _Point);
+        // ZN de acionamento: ZN Venda (posição atual)
+        signal.znTriggerPrice = znDownPriceFromChart;
 
         Print("🔴 1º SINAL - VENDA (PENDING)");
         Print("   ZN Acionamento: ", signal.znTriggerPrice);
         Print("   Entrada: ZN Venda - 200 = ", signal.preco_entrada);
-        Print("   Stop: CR Topo - 200 = ", signal.stop_loss);
+        Print("   Stop: CR Topo + 200 = ", signal.stop_loss);
 
         // Marca como primeira ordem
         activeZNs[activeZNIndex].firstManualSignalType = "VENDA";
@@ -1357,10 +1476,12 @@ void CheckPendingSignalActivation()
             if(UpdateSignalStatus(currentBuySignal.id, "EM_OPERACAO", lastClose))
             {
                 currentBuySignal.status = "EM_OPERACAO";
+                
                 Alert("🚀 ORDEM DE COMPRA ACIONADA!\n" +
                       "Preço: " + DoubleToString(lastClose, _Digits) + "\n" +
                       "Entrada: " + DoubleToString(currentBuySignal.preco_entrada, _Digits) + "\n" +
-                      "Stop: " + DoubleToString(currentBuySignal.stop_loss, _Digits));
+                      "Stop: " + DoubleToString(currentBuySignal.stop_loss, _Digits) + "\n\n" +
+                      "💡 Dica: Mova a ZN de VENDA para ajustar a 2ª entrada e clique em UPDATE");
                 Print("✅ Status atualizado para EM_OPERACAO");
             }
         }
@@ -1387,10 +1508,12 @@ void CheckPendingSignalActivation()
             if(UpdateSignalStatus(currentSellSignal.id, "EM_OPERACAO", lastClose))
             {
                 currentSellSignal.status = "EM_OPERACAO";
+                
                 Alert("🚀 ORDEM DE VENDA ACIONADA!\n" +
                       "Preço: " + DoubleToString(lastClose, _Digits) + "\n" +
                       "Entrada: " + DoubleToString(currentSellSignal.preco_entrada, _Digits) + "\n" +
-                      "Stop: " + DoubleToString(currentSellSignal.stop_loss, _Digits));
+                      "Stop: " + DoubleToString(currentSellSignal.stop_loss, _Digits) + "\n\n" +
+                      "💡 Dica: Mova a ZN de COMPRA para ajustar a 2ª entrada e clique em UPDATE");
                 Print("✅ Status atualizado para EM_OPERACAO");
             }
         }
@@ -1403,56 +1526,120 @@ void CheckPendingSignalActivation()
 
 void MonitorPriceLevels()
 {
+    // Só monitora se houver sinal EM_OPERACAO
+    if(!hasBuySignal && !hasSellSignal) return;
+
     double currentBid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
 
-    // Monitorar apenas sinais que estão EM_OPERACAO
+    // Monitorar sinal de COMPRA (apenas se estiver EM_OPERACAO)
     if(hasBuySignal && currentBuySignal.status == "EM_OPERACAO")
     {
-        if(currentBid <= currentBuySignal.stop_loss)
+        // Verifica TAKE 1
+        if(currentBuySignal.take_profit[0] > 0 && currentBid >= currentBuySignal.take_profit[0])
         {
-            EncerrarSinal(currentBuySignal.id);
-            UpdateSignalStatus(currentBuySignal.id, "STOP_LOSS", currentBid);
-            hasBuySignal = false;
-            Alert("⛔ STOP LOSS atingido em COMPRA!\nPreço: " + DoubleToString(currentBid, _Digits));
+            UpdateSignalStatus(currentBuySignal.id, "TAKE1", currentBid);
+            Alert("🎯 TAKE 1 atingido em COMPRA!\nPreço: " + DoubleToString(currentBid, _Digits) + "\n✅ Operação garantida! Stop não é mais monitorado.");
+            Print("✅ TAKE 1 atingido. Stop desativado. Agora monitorando apenas TAKE 2 e 3");
+            currentBuySignal.take_profit[0] = 0; // Para de monitorar Take1
+            currentBuySignal.stop_loss = 0; // DESATIVA o stop - Take1 é o objetivo principal
             return;
         }
 
-        // Verificar apenas os 3 primeiros takes (Take1, Take2, Take3)
-        for(int i = 2; i >= 0; i--)
+        // Verifica STOP LOSS (só se Take1 ainda NÃO foi atingido)
+        if(currentBuySignal.take_profit[0] > 0 && currentBid <= currentBuySignal.stop_loss)
         {
-            if(currentBuySignal.take_profit[i] > 0 && currentBid >= currentBuySignal.take_profit[i])
-            {
-                string status = "TAKE" + IntegerToString(i+1);
-                UpdateSignalStatus(currentBuySignal.id, status, currentBid);
-                Alert("🎯 TAKE " + IntegerToString(i+1) + " atingido em COMPRA!\nPreço: " + DoubleToString(currentBid, _Digits));
-                if(i == 2) { EncerrarSinal(currentBuySignal.id); hasBuySignal = false; }
-                return;
-            }
+            UpdateSignalStatus(currentBuySignal.id, "STOP_LOSS", currentBid);
+            Alert("⛔ STOP LOSS atingido em COMPRA!\nPreço: " + DoubleToString(currentBid, _Digits));
+            EncerrarSinal(currentBuySignal.id);
+            hasBuySignal = false;
+            Print("❌ Sinal de COMPRA encerrado por STOP LOSS");
+            return;
+        }
+
+        // Verifica TAKE 2 (só se Take1 já foi zerado)
+        if(currentBuySignal.take_profit[0] == 0 && currentBuySignal.take_profit[1] > 0 && currentBid >= currentBuySignal.take_profit[1])
+        {
+            UpdateSignalStatus(currentBuySignal.id, "TAKE2", currentBid);
+            Alert("🎯🎯 TAKE 2 atingido em COMPRA!\nPreço: " + DoubleToString(currentBid, _Digits));
+            Print("✅✅ TAKE 2 atingido. Agora monitorando apenas TAKE 3");
+            currentBuySignal.take_profit[1] = 0; // Para de monitorar Take2
+            return;
+        }
+
+        // Verifica TAKE 3 (só se Take1 e Take2 já foram zerados)
+        if(currentBuySignal.take_profit[0] == 0 && currentBuySignal.take_profit[1] == 0 &&
+           currentBuySignal.take_profit[2] > 0 && currentBid >= currentBuySignal.take_profit[2])
+        {
+            UpdateSignalStatus(currentBuySignal.id, "TAKE3", currentBid);
+            Alert("🎯🎯🎯 TAKE 3 (FINAL) atingido em COMPRA!\nPreço: " + DoubleToString(currentBid, _Digits));
+            Print("✅✅✅ TAKE 3 atingido. Operação ENCERRADA com sucesso!");
+            EncerrarSinal(currentBuySignal.id);
+            hasBuySignal = false;
+            return;
+        }
+
+        // Se Take1 já foi atingido (take_profit[0] == 0) mas o preço voltou e não atingiu Take2/Take3
+        // Apenas encerra silenciosamente sem registrar como STOP
+        if(currentBuySignal.take_profit[0] == 0 && currentBuySignal.stop_loss == 0)
+        {
+            // Operação já garantiu Take1, não há mais nada a monitorar se não atingir Take2/Take3
+            // Pode adicionar lógica de trailing stop ou break-even aqui se desejar
         }
     }
 
+    // Monitorar sinal de VENDA (apenas se estiver EM_OPERACAO)
     if(hasSellSignal && currentSellSignal.status == "EM_OPERACAO")
     {
-        if(currentBid >= currentSellSignal.stop_loss)
+        // Verifica TAKE 1
+        if(currentSellSignal.take_profit[0] > 0 && currentBid <= currentSellSignal.take_profit[0])
         {
-            EncerrarSinal(currentSellSignal.id);
-            UpdateSignalStatus(currentSellSignal.id, "STOP_LOSS", currentBid);
-            hasSellSignal = false;
-            Alert("⛔ STOP LOSS atingido em VENDA!\nPreço: " + DoubleToString(currentBid, _Digits));
+            UpdateSignalStatus(currentSellSignal.id, "TAKE1", currentBid);
+            Alert("🎯 TAKE 1 atingido em VENDA!\nPreço: " + DoubleToString(currentBid, _Digits) + "\n✅ Operação garantida! Stop não é mais monitorado.");
+            Print("✅ TAKE 1 atingido. Stop desativado. Agora monitorando apenas TAKE 2 e 3");
+            currentSellSignal.take_profit[0] = 0; // Para de monitorar Take1
+            currentSellSignal.stop_loss = 0; // DESATIVA o stop - Take1 é o objetivo principal
             return;
         }
 
-        // Verificar apenas os 3 primeiros takes (Take1, Take2, Take3)
-        for(int i = 2; i >= 0; i--)
+        // Verifica STOP LOSS (só se Take1 ainda NÃO foi atingido)
+        if(currentSellSignal.take_profit[0] > 0 && currentBid >= currentSellSignal.stop_loss)
         {
-            if(currentSellSignal.take_profit[i] > 0 && currentBid <= currentSellSignal.take_profit[i])
-            {
-                string status = "TAKE" + IntegerToString(i+1);
-                UpdateSignalStatus(currentSellSignal.id, status, currentBid);
-                Alert("🎯 TAKE " + IntegerToString(i+1) + " atingido em VENDA!\nPreço: " + DoubleToString(currentBid, _Digits));
-                if(i == 2) { EncerrarSinal(currentSellSignal.id); hasSellSignal = false; }
-                return;
-            }
+            UpdateSignalStatus(currentSellSignal.id, "STOP_LOSS", currentBid);
+            Alert("⛔ STOP LOSS atingido em VENDA!\nPreço: " + DoubleToString(currentBid, _Digits));
+            EncerrarSinal(currentSellSignal.id);
+            hasSellSignal = false;
+            Print("❌ Sinal de VENDA encerrado por STOP LOSS");
+            return;
+        }
+
+        // Verifica TAKE 2 (só se Take1 já foi zerado)
+        if(currentSellSignal.take_profit[0] == 0 && currentSellSignal.take_profit[1] > 0 && currentBid <= currentSellSignal.take_profit[1])
+        {
+            UpdateSignalStatus(currentSellSignal.id, "TAKE2", currentBid);
+            Alert("🎯🎯 TAKE 2 atingido em VENDA!\nPreço: " + DoubleToString(currentBid, _Digits));
+            Print("✅✅ TAKE 2 atingido. Agora monitorando apenas TAKE 3");
+            currentSellSignal.take_profit[1] = 0; // Para de monitorar Take2
+            return;
+        }
+
+        // Verifica TAKE 3 (só se Take1 e Take2 já foram zerados)
+        if(currentSellSignal.take_profit[0] == 0 && currentSellSignal.take_profit[1] == 0 &&
+           currentSellSignal.take_profit[2] > 0 && currentBid <= currentSellSignal.take_profit[2])
+        {
+            UpdateSignalStatus(currentSellSignal.id, "TAKE3", currentBid);
+            Alert("🎯🎯🎯 TAKE 3 (FINAL) atingido em VENDA!\nPreço: " + DoubleToString(currentBid, _Digits));
+            Print("✅✅✅ TAKE 3 atingido. Operação ENCERRADA com sucesso!");
+            EncerrarSinal(currentSellSignal.id);
+            hasSellSignal = false;
+            return;
+        }
+
+        // Se Take1 já foi atingido (take_profit[0] == 0) mas o preço voltou e não atingiu Take2/Take3
+        // Apenas encerra silenciosamente sem registrar como STOP
+        if(currentSellSignal.take_profit[0] == 0 && currentSellSignal.stop_loss == 0)
+        {
+            // Operação já garantiu Take1, não há mais nada a monitorar se não atingir Take2/Take3
+            // Pode adicionar lógica de trailing stop ou break-even aqui se desejar
         }
     }
 }
@@ -1490,6 +1677,133 @@ bool UpdateSignalStatus(string signalId, string status, double preco_saida)
 void EncerrarSinal(string signalId)
 {
     Print("🔚 Encerrando sinal: ", signalId);
+}
+
+void UpdateSignalFromZNMovement()
+{
+    Print("🔄 Botão UPDATE pressionado - Verificando ajuste de ZNs...");
+    
+    // Verifica se há sinal de COMPRA ativo
+    if(hasBuySignal)
+    {
+        // Buscar a linha da ZN de COMPRA atual no gráfico
+        string znLineName = INDICATOR_PREFIX + currentBuySignal.sessionPrefix + "REPL_UP_1" + IntegerToString((int)currentBuySignal.diaUnicoID);
+        
+        if(ObjectFind(0, znLineName) >= 0)
+        {
+            // Ler o preço atual da ZN (pode ter sido movida pelo usuário)
+            double newZNPrice = ObjectGetDouble(0, znLineName, OBJPROP_PRICE, 0); // 0 = primeiro ponto da linha
+            double oldEntry = currentBuySignal.preco_entrada;
+            double newEntry = newZNPrice + (200 * _Point);
+            
+            if(MathAbs(newEntry - oldEntry) > (_Point * 10)) // Mudança significativa (>10 pontos)
+            {
+                Print("📝 ZN de COMPRA movida: ", currentBuySignal.znTriggerPrice, " → ", newZNPrice);
+                Print("   Nova Entrada: ", oldEntry, " → ", newEntry);
+                
+                // Atualizar localmente
+                currentBuySignal.znTriggerPrice = newZNPrice;
+                currentBuySignal.preco_entrada = newEntry;
+                
+                // Enviar atualização para a API
+                if(UpdateSignalEntry(currentBuySignal.id, newEntry))
+                {
+                    Alert("✅ Entrada de COMPRA atualizada!\n" +
+                          "Nova ZN: " + DoubleToString(newZNPrice, _Digits) + "\n" +
+                          "Nova Entrada: " + DoubleToString(newEntry, _Digits));
+                }
+            }
+            else
+            {
+                Print("ℹ️ ZN de COMPRA não foi movida significativamente");
+            }
+        }
+    }
+    
+    // Verifica se há sinal de VENDA ativo
+    if(hasSellSignal)
+    {
+        // Buscar a linha da ZN de VENDA atual no gráfico
+        string znLineName = INDICATOR_PREFIX + currentSellSignal.sessionPrefix + "REPL_DOWN_1" + IntegerToString((int)currentSellSignal.diaUnicoID);
+        
+        if(ObjectFind(0, znLineName) >= 0)
+        {
+            // Ler o preço atual da ZN (pode ter sido movida pelo usuário)
+            double newZNPrice = ObjectGetDouble(0, znLineName, OBJPROP_PRICE, 0); // 0 = primeiro ponto da linha
+            double oldEntry = currentSellSignal.preco_entrada;
+            double newEntry = newZNPrice - (200 * _Point);
+            
+            if(MathAbs(newEntry - oldEntry) > (_Point * 10)) // Mudança significativa (>10 pontos)
+            {
+                Print("📝 ZN de VENDA movida: ", currentSellSignal.znTriggerPrice, " → ", newZNPrice);
+                Print("   Nova Entrada: ", oldEntry, " → ", newEntry);
+                
+                // Atualizar localmente
+                currentSellSignal.znTriggerPrice = newZNPrice;
+                currentSellSignal.preco_entrada = newEntry;
+                
+                // Enviar atualização para a API
+                if(UpdateSignalEntry(currentSellSignal.id, newEntry))
+                {
+                    Alert("✅ Entrada de VENDA atualizada!\n" +
+                          "Nova ZN: " + DoubleToString(newZNPrice, _Digits) + "\n" +
+                          "Nova Entrada: " + DoubleToString(newEntry, _Digits));
+                }
+            }
+            else
+            {
+                Print("ℹ️ ZN de VENDA não foi movida significativamente");
+            }
+        }
+    }
+    
+    if(!hasBuySignal && !hasSellSignal)
+    {
+        Print("⚠️ Nenhum sinal ativo para atualizar");
+        Alert("⚠️ Nenhum sinal ativo.\nEnvie um sinal antes de usar UPDATE.");
+    }
+}
+
+bool UpdateSignalEntry(string signalId, double newEntry)
+{
+    // Fazer requisição PATCH para atualizar entrada
+    string url = EndpointURL + "/" + signalId;
+    string json = "{\"entry\":" + DoubleToString(newEntry, _Digits) + "}";
+    
+    Print("📤 Atualizando entrada via API: ", json);
+    Print("   URL: ", url);
+    
+    char post[];
+    char result[];
+    string headers = "Content-Type: application/json\r\n";
+    string result_headers;
+    
+    int jsonLen = StringLen(json);
+    ArrayResize(post, jsonLen);
+    StringToCharArray(json, post, 0, jsonLen, CP_UTF8);
+    
+    int timeout = 5000;
+    int res = WebRequest("PATCH", url, headers, timeout, post, result, result_headers);
+    
+    if(res == -1)
+    {
+        Print("❌ Erro WebRequest: ", GetLastError());
+        return false;
+    }
+    
+    string responseStr = CharArrayToString(result);
+    if(res >= 200 && res < 300)
+    {
+        Print("✅ Entrada atualizada com sucesso! Status: ", res);
+        Print("📡 Resposta: ", responseStr);
+        return true;
+    }
+    else
+    {
+        Print("❌ Erro ao atualizar entrada. Código: ", res);
+        Print("📡 Resposta: ", responseStr);
+        return false;
+    }
 }
 
 void CreateButtons()
@@ -1560,6 +1874,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
         {
             Print("🔄 Botão Update pressionado");
             ObjectSetInteger(0, "BtnUpdate", OBJPROP_STATE, false);
+            UpdateSignalFromZNMovement();
             ChartRedraw();
         }
     }

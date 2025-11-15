@@ -22,7 +22,7 @@ double dummyBuffer[];
 #define DATA_EXPIRACAO "31.12.2025"
 #define CONTA_PERMITIDA1 10184374
 #define CONTA_PERMITIDA2 341015440
-#define CONTA_PERMITIDA3 566595
+#define CONTA_PERMITIDA3 8050696
 
 //============================
 // INPUTS DO SCALPER (MarlonBritoScalper)

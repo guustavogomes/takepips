@@ -4,8 +4,8 @@
  * Dashboard de estatísticas com design moderno e legível
  */
 
-import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 
@@ -38,6 +38,9 @@ const fetchStats = async (): Promise<StatsResponse> => {
 };
 
 export function StatsDashboard() {
+  // Estado para controlar quais cards estão expandidos - todos fechados por padrão
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+
   const { data: stats, isLoading, error } = useQuery({
     queryKey: ['signal-stats'],
     queryFn: fetchStats,
@@ -58,63 +61,91 @@ export function StatsDashboard() {
     return null;
   }
 
+  const toggleCard = (cardId: string) => {
+    setExpandedCards((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(cardId)) {
+        newSet.delete(cardId);
+      } else {
+        newSet.add(cardId);
+      }
+      return newSet;
+    });
+  };
+
   const renderStatCard = (
+    cardId: string,
     title: string,
     stat: SignalStats,
     icon: string,
     accentColor: string
   ) => {
     const isPositive = stat.totalPips >= 0;
+    const isExpanded = expandedCards.has(cardId);
 
     return (
-      <View style={[styles.statCard, { borderColor: accentColor }]}>
-        {/* Header com ícone e título */}
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => toggleCard(cardId)}
+        style={[styles.statCard, { borderColor: accentColor }]}
+      >
+        {/* Header com ícone, título e indicador de expansão */}
         <View style={styles.cardHeader}>
-          <MaterialCommunityIcons name={icon as any} size={22} color={accentColor} />
-          <Text style={styles.cardTitle}>{title}</Text>
+          <View style={styles.cardHeaderLeft}>
+            <MaterialCommunityIcons name={icon as any} size={18} color={accentColor} />
+            <Text style={styles.cardTitle}>{title}</Text>
+          </View>
+          <View style={styles.cardHeaderRight}>
+            {/* Pips compactos sempre visíveis */}
+            <Text
+              style={[
+                styles.compactPips,
+                { color: isPositive ? '#10b981' : '#ef4444' },
+              ]}
+            >
+              {isPositive ? '+' : ''}
+              {stat.totalPips.toFixed(1)}
+            </Text>
+            <MaterialCommunityIcons
+              name={isExpanded ? 'chevron-up' : 'chevron-down'}
+              size={20}
+              color="#6B7280"
+            />
+          </View>
         </View>
 
-        {/* Pips principais */}
-        <View style={styles.pipsContainer}>
-          <Text
-            style={[
-              styles.pipsValue,
-              { color: isPositive ? '#10b981' : '#ef4444' },
-            ]}
-          >
-            {isPositive ? '+' : ''}
-            {stat.totalPips.toFixed(1)}
-          </Text>
-          <Text style={styles.pipsLabel}>pips</Text>
-        </View>
-
-        {/* Métricas secundárias */}
-        <View style={styles.metricsRow}>
-          <View style={styles.metric}>
-            <Text style={styles.metricLabel}>Taxa Sinais</Text>
-            <View style={styles.metricValueRow}>
-              <Text style={[styles.metricValue, { color: accentColor }]}>
-                {stat.winRate.toFixed(0)}%
-              </Text>
-              <Text style={styles.metricSeparator}>•</Text>
-              <Text style={styles.metricSecondary}>{stat.totalSignals}</Text>
+        {/* Conteúdo expandido */}
+        {isExpanded && (
+          <>
+            {/* Métricas secundárias */}
+            <View style={styles.metricsRow}>
+              <View style={styles.metric}>
+                <Text style={styles.metricLabel}>Taxa • Sinais</Text>
+                <View style={styles.metricValueRow}>
+                  <Text style={[styles.metricValue, { color: accentColor }]}>
+                    {stat.winRate.toFixed(0)}%
+                  </Text>
+                  <Text style={styles.metricSeparator}>•</Text>
+                  <Text style={styles.metricSecondary}>{stat.totalSignals}</Text>
+                </View>
+              </View>
             </View>
-          </View>
-        </View>
 
-        {/* W/L em destaque */}
-        <View style={styles.wlContainer}>
-          <View style={styles.wlItem}>
-            <Text style={[styles.wlValue, { color: '#10b981' }]}>{stat.wins}</Text>
-            <Text style={styles.wlLabel}>W</Text>
-          </View>
-          <View style={styles.wlDivider} />
-          <View style={styles.wlItem}>
-            <Text style={[styles.wlValue, { color: '#ef4444' }]}>{stat.losses}</Text>
-            <Text style={styles.wlLabel}>L</Text>
-          </View>
-        </View>
-      </View>
+            {/* W/L em destaque */}
+            <View style={styles.wlContainer}>
+              <View style={styles.wlItem}>
+                <Text style={[styles.wlValue, { color: '#10b981' }]}>{stat.wins}</Text>
+                <Text style={styles.wlLabel}>W</Text>
+              </View>
+              <View style={styles.wlDivider} />
+              <View style={styles.wlItem}>
+                <Text style={[styles.wlValue, { color: '#ef4444' }]}>{stat.losses}</Text>
+                <Text style={styles.wlLabel}>L</Text>
+              </View>
+            </View>
+          </>
+        )}
+      </TouchableOpacity>
     );
   };
 
@@ -128,9 +159,9 @@ export function StatsDashboard() {
 
       {/* Grid de estatísticas */}
       <View style={styles.statsGrid}>
-        {renderStatCard('Hoje', stats.today, 'calendar-today', '#FFD700')}
-        {renderStatCard('30 Dias', stats.last30Days, 'calendar-month', '#6366f1')}
-        {renderStatCard('90 Dias', stats.last90Days, 'chart-timeline-variant', '#10b981')}
+        {renderStatCard('today', 'Hoje', stats.today, 'calendar-today', '#FFD700')}
+        {renderStatCard('30days', '30 Dias', stats.last30Days, 'calendar-month', '#6366f1')}
+        {renderStatCard('90days', '90 Dias', stats.last90Days, 'chart-timeline-variant', '#10b981')}
       </View>
     </View>
   );
@@ -163,26 +194,35 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   statsGrid: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 12,
   },
   statCard: {
-    flex: 1,
     backgroundColor: '#0f1419',
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
+    justifyContent: 'space-between',
+  },
+  cardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  cardHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   cardTitle: {
     fontSize: 11,
@@ -191,23 +231,14 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  pipsContainer: {
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  pipsValue: {
-    fontSize: 26,
+  compactPips: {
+    fontSize: 16,
     fontWeight: 'bold',
     letterSpacing: -0.5,
   },
-  pipsLabel: {
-    fontSize: 10,
-    color: '#6B7280',
-    marginTop: -2,
-    fontWeight: '600',
-  },
   metricsRow: {
-    marginBottom: 10,
+    marginTop: 12,
+    marginBottom: 8,
   },
   metric: {
     alignItems: 'center',
@@ -242,9 +273,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#1a1f2e',
     borderRadius: 8,
-    padding: 8,
+    padding: 6,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 8,
   },
   wlItem: {
     flex: 1,
@@ -252,17 +284,17 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   wlValue: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
   },
   wlLabel: {
-    fontSize: 9,
+    fontSize: 8,
     color: '#6B7280',
     fontWeight: '700',
   },
   wlDivider: {
     width: 1,
-    height: 24,
+    height: 20,
     backgroundColor: '#374151',
   },
 });
